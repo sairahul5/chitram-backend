@@ -19,13 +19,13 @@ public class ChitramApplication {
         return args -> {
             try {
                 jdbcTemplate.execute("""
-                    CREATE TABLE IF NOT EXISTS saved_pins (
-                        user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                        visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        PRIMARY KEY (user_id, visual_item_id)
-                    )
-                    """);
+                        CREATE TABLE IF NOT EXISTS saved_pins (
+                            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (user_id, visual_item_id)
+                        )
+                        """);
                 jdbcTemplate.queryForObject("SELECT 1", Integer.class);
                 System.out.println("Chitram database connection successful");
             } catch (DataAccessException exception) {

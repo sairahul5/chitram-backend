@@ -10,5 +10,5 @@ public record PublicProfileResponse(
         String pictureUrl,
         long followersCount,
         long creationsCount,
-        List<VisualItemResponse> creations
-) {}
+        List<VisualItemResponse> creations) {
+}

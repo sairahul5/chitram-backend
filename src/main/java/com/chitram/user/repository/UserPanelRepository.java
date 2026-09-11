@@ -24,13 +24,13 @@ public class UserPanelRepository {
         String search = query == null ? "" : query.trim();
         return jdbcTemplate.query(
                 """
-                SELECT u.id, u.display_name, u.picture_url, u.username,
-                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count
-                FROM users u
-                WHERE LOWER(u.display_name) LIKE LOWER(?) OR LOWER(COALESCE(u.username, '')) LIKE LOWER(?)
-                ORDER BY u.display_name ASC
-                LIMIT 30
-                """,
+                        SELECT u.id, u.display_name, u.picture_url, u.username,
+                               (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count
+                        FROM users u
+                        WHERE LOWER(u.display_name) LIKE LOWER(?) OR LOWER(COALESCE(u.username, '')) LIKE LOWER(?)
+                        ORDER BY u.display_name ASC
+                        LIMIT 30
+                        """,
                 (resultSet, rowNumber) -> new UserSummaryResponse(
                         resultSet.getLong("id"),
                         resultSet.getString("display_name"),
@@ -69,15 +69,15 @@ public class UserPanelRepository {
 
     public List<VisualItemResponse> findSavedPinsByUserId(long userId) {
         String sql = """
-            SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                   v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
-            FROM saved_pins s
-            JOIN visual_items v ON v.id = s.visual_item_id
-            LEFT JOIN users u ON u.id = v.uploaded_by
-            WHERE s.user_id = ?
-            ORDER BY s.created_at DESC
-            """;
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                FROM saved_pins s
+                JOIN visual_items v ON v.id = s.visual_item_id
+                LEFT JOIN users u ON u.id = v.uploaded_by
+                WHERE s.user_id = ?
+                ORDER BY s.created_at DESC
+                """;
         return jdbcTemplate.query(sql, visualItemRowMapper, userId);
     }
 
@@ -105,7 +105,8 @@ public class UserPanelRepository {
         return count == null ? 0 : count;
     }
 
-    private final org.springframework.jdbc.core.RowMapper<VisualItemResponse> visualItemRowMapper = (resultSet, rowNumber) -> {
+    private final org.springframework.jdbc.core.RowMapper<VisualItemResponse> visualItemRowMapper = (resultSet,
+            rowNumber) -> {
         java.sql.Timestamp createdAtTimestamp = resultSet.getTimestamp("created_at");
         java.time.Instant createdAt = createdAtTimestamp != null ? createdAtTimestamp.toInstant() : null;
         java.math.BigDecimal aspectRatio = resultSet.getBigDecimal("aspect_ratio");
@@ -130,20 +131,19 @@ public class UserPanelRepository {
                 uploadedBy,
                 resultSet.getString("creator_name"),
                 resultSet.getString("creator_username"),
-                resultSet.getString("creator_picture_url")
-        );
+                resultSet.getString("creator_picture_url"));
     };
 
     public List<VisualItemResponse> findCreationsByUserId(long userId) {
         String sql = """
-            SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                   v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
-            FROM visual_items v
-            LEFT JOIN users u ON u.id = v.uploaded_by
-            WHERE v.uploaded_by = ?
-            ORDER BY v.id DESC
-            """;
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                FROM visual_items v
+                LEFT JOIN users u ON u.id = v.uploaded_by
+                WHERE v.uploaded_by = ?
+                ORDER BY v.id DESC
+                """;
         return jdbcTemplate.query(sql, visualItemRowMapper, userId);
     }
 
@@ -172,14 +172,14 @@ public class UserPanelRepository {
 
     public List<UserSummaryResponse> findFollowers(long currentUserId, long targetUserId) {
         String sql = """
-            SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
-                   (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
-                   EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
-            FROM user_follows f
-            JOIN users u ON u.id = f.follower_id
-            WHERE f.following_id = ?
-            ORDER BY f.created_at DESC
-            """;
+                SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
+                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
+                       EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
+                FROM user_follows f
+                JOIN users u ON u.id = f.follower_id
+                WHERE f.following_id = ?
+                ORDER BY f.created_at DESC
+                """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new UserSummaryResponse(
                 rs.getLong("id"),
                 rs.getString("display_name"),
@@ -193,14 +193,14 @@ public class UserPanelRepository {
 
     public List<UserSummaryResponse> findFollowing(long currentUserId, long targetUserId) {
         String sql = """
-            SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
-                   (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
-                   EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
-            FROM user_follows f
-            JOIN users u ON u.id = f.following_id
-            WHERE f.follower_id = ?
-            ORDER BY f.created_at DESC
-            """;
+                SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
+                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
+                       EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
+                FROM user_follows f
+                JOIN users u ON u.id = f.following_id
+                WHERE f.follower_id = ?
+                ORDER BY f.created_at DESC
+                """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new UserSummaryResponse(
                 rs.getLong("id"),
                 rs.getString("display_name"),
@@ -214,14 +214,14 @@ public class UserPanelRepository {
 
     public List<UserSummaryResponse> findSuggestedCreators(long currentUserId) {
         String sql = """
-            SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
-                   (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
-                   EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
-            FROM users u
-            WHERE u.id != ?
-            ORDER BY followers_count DESC, u.created_at DESC
-            LIMIT 20
-            """;
+                SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
+                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
+                       EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
+                FROM users u
+                WHERE u.id != ?
+                ORDER BY followers_count DESC, u.created_at DESC
+                LIMIT 20
+                """;
         return jdbcTemplate.query(sql, (rs, rowNum) -> new UserSummaryResponse(
                 rs.getLong("id"),
                 rs.getString("display_name"),
@@ -235,13 +235,13 @@ public class UserPanelRepository {
 
     public List<VisualItemResponse> findAllCreations() {
         String sql = """
-            SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                   v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
-            FROM visual_items v
-            LEFT JOIN users u ON u.id = v.uploaded_by
-            ORDER BY v.id DESC
-            """;
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                FROM visual_items v
+                LEFT JOIN users u ON u.id = v.uploaded_by
+                ORDER BY v.id DESC
+                """;
         return jdbcTemplate.query(sql, visualItemRowMapper);
     }
 }

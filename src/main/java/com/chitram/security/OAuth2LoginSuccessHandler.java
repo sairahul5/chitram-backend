@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 @Component
 public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
@@ -47,6 +48,20 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             adminEventPublisher.publishDashboard(adminPanelService.getDashboard());
         } catch (Exception ignored) { /* don't break login if WS publish fails */ }
         String destination = userAccountService.isAdmin(email) ? "/admin" : "/user";
-        getRedirectStrategy().sendRedirect(request, response, frontendUrl + destination);
+        getRedirectStrategy().sendRedirect(request, response, resolveFrontendBaseUrl(request) + destination);
+    }
+
+    private String resolveFrontendBaseUrl(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        if (origin != null && !origin.isBlank()) {
+            return origin;
+        }
+
+        return Arrays.stream(frontendUrl.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .filter(value -> !value.contains("*"))
+                .findFirst()
+                .orElse(frontendUrl.trim());
     }
 }
