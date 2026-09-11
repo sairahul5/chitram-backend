@@ -27,7 +27,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/error", "/oauth2/**", "/login/**", "/api/auth/logout").permitAll()
+                        .requestMatchers("/health", "/error", "/oauth2/**", "/login/**", "/api/auth/logout").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/visual-items/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/user/search", "/api/user/profile/*").permitAll()
