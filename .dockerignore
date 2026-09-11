@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+target/
+uploads/
+.git/
+.idea/
+*.iml
+.DS_Store
+README.md
+Dockerfile
+.dockerignore
