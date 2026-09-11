@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -115,5 +117,39 @@ public class VisualItemController {
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateVisualItem(
+            @PathVariable("id") Long id,
+            @RequestBody UpdateVisualItemRequest request,
+            @AuthenticationPrincipal OAuth2User user) {
+
+        if (user == null || user.getAttribute("email") == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Authentication required"));
+        }
+
+        String email = user.getAttribute("email");
+        Long userId = userAccountRepository.findByEmail(email)
+                .map(account -> account.getId())
+                .orElse(null);
+
+        try {
+            VisualItemResponse updated = visualItemService.updatePin(
+                    id,
+                    request.title(),
+                    request.category(),
+                    request.description(),
+                    userId,
+                    adminPanelRepository.isAdmin(email));
+            return ResponseEntity.ok(updated);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    public record UpdateVisualItemRequest(String title, String category, String description) {
     }
 }

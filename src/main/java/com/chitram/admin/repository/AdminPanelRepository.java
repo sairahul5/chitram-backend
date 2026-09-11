@@ -76,7 +76,8 @@ public class AdminPanelRepository {
                 role);
     }
 
-    private final org.springframework.jdbc.core.RowMapper<VisualItemResponse> visualItemRowMapper = (resultSet, rowNumber) -> {
+    private final org.springframework.jdbc.core.RowMapper<VisualItemResponse> visualItemRowMapper = (resultSet,
+            rowNumber) -> {
         java.sql.Timestamp createdAtTimestamp = resultSet.getTimestamp("created_at");
         java.time.Instant createdAt = createdAtTimestamp != null ? createdAtTimestamp.toInstant() : null;
         java.math.BigDecimal aspectRatio = resultSet.getBigDecimal("aspect_ratio");
@@ -101,21 +102,20 @@ public class AdminPanelRepository {
                 uploadedBy,
                 resultSet.getString("creator_name"),
                 resultSet.getString("creator_username"),
-                resultSet.getString("creator_picture_url")
-        );
+                resultSet.getString("creator_picture_url"));
     };
 
     public List<VisualItemResponse> findVisualItems(String query) {
         String search = query == null ? "" : query.trim();
         String sql = """
-            SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                   v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
-            FROM visual_items v
-            LEFT JOIN users u ON u.id = v.uploaded_by
-            WHERE LOWER(v.title) LIKE LOWER(?) OR LOWER(v.category) LIKE LOWER(?)
-            ORDER BY v.id DESC
-            """;
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                FROM visual_items v
+                LEFT JOIN users u ON u.id = v.uploaded_by
+                WHERE LOWER(v.title) LIKE LOWER(?) OR LOWER(v.category) LIKE LOWER(?)
+                ORDER BY v.id DESC
+                """;
         return jdbcTemplate.query(sql, visualItemRowMapper, "%" + search + "%", "%" + search + "%");
     }
 
@@ -125,14 +125,15 @@ public class AdminPanelRepository {
         boolean hasSearch = !search.isEmpty();
         boolean hasCursor = cursor != null && cursor > 0;
 
-        StringBuilder sql = new StringBuilder("""
-            SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                   v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
-            FROM visual_items v
-            LEFT JOIN users u ON u.id = v.uploaded_by
-            WHERE 1=1
-            """);
+        StringBuilder sql = new StringBuilder(
+                """
+                        SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                               v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                               u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                        FROM visual_items v
+                        LEFT JOIN users u ON u.id = v.uploaded_by
+                        WHERE 1=1
+                        """);
 
         java.util.List<Object> params = new java.util.ArrayList<>();
 
@@ -155,13 +156,13 @@ public class AdminPanelRepository {
 
     public java.util.Optional<VisualItemResponse> findById(long id) {
         String sql = """
-            SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                   v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
-            FROM visual_items v
-            LEFT JOIN users u ON u.id = v.uploaded_by
-            WHERE v.id = ?
-            """;
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                FROM visual_items v
+                LEFT JOIN users u ON u.id = v.uploaded_by
+                WHERE v.id = ?
+                """;
         List<VisualItemResponse> items = jdbcTemplate.query(sql, visualItemRowMapper, id);
         return items.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(items.get(0));
     }
@@ -179,12 +180,12 @@ public class AdminPanelRepository {
             String description,
             Long uploadedBy) {
         String sql = """
-            INSERT INTO visual_items (
-                title, category, image_url, image_path, width, height, aspect_ratio,
-                file_size, mime_type, description, uploaded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id
-            """;
+                INSERT INTO visual_items (
+                    title, category, image_url, image_path, width, height, aspect_ratio,
+                    file_size, mime_type, description, uploaded_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+                """;
         Long insertedId = jdbcTemplate.queryForObject(
                 sql,
                 Long.class,
@@ -198,12 +199,20 @@ public class AdminPanelRepository {
                 fileSize,
                 mimeType,
                 description,
-                uploadedBy
-        );
+                uploadedBy);
         return findById(insertedId != null ? insertedId : 0L).orElse(null);
     }
 
     public void deleteVisualItem(long id) {
         jdbcTemplate.update("DELETE FROM visual_items WHERE id = ?", id);
+    }
+
+    public void updateVisualItem(long id, String title, String category, String description) {
+        jdbcTemplate.update(
+                "UPDATE visual_items SET title = ?, category = ?, description = ? WHERE id = ?",
+                title,
+                category,
+                description,
+                id);
     }
 }

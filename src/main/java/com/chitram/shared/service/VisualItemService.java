@@ -38,8 +38,7 @@ public class VisualItemService {
             "image/jpg",
             "image/png",
             "image/webp",
-            "image/avif"
-    );
+            "image/avif");
 
     private final AdminPanelRepository adminPanelRepository;
     private final AdminEventPublisher adminEventPublisher;
@@ -115,7 +114,8 @@ public class VisualItemService {
             log.debug("ImageIO could not decode dimensions directly: {}", e.getMessage());
         }
 
-        // Fallback to client-measured dimensions if ImageIO didn't decode (e.g. WebP / AVIF)
+        // Fallback to client-measured dimensions if ImageIO didn't decode (e.g. WebP /
+        // AVIF)
         if (width <= 0 || height <= 0) {
             if (clientWidth != null && clientHeight != null && clientWidth > 0 && clientHeight > 0) {
                 width = clientWidth;
@@ -157,8 +157,7 @@ public class VisualItemService {
                 fileSize,
                 mimeType,
                 description != null ? description.trim() : null,
-                uploadedBy
-        );
+                uploadedBy);
         // Broadcast new image to admin WebSocket subscribers
         adminEventPublisher.publishNewImage(saved);
         return saved;
@@ -181,6 +180,26 @@ public class VisualItemService {
         adminPanelRepository.deleteVisualItem(pinId);
         // Broadcast deletion to admin WebSocket subscribers
         adminEventPublisher.publishDeletedImage(pinId);
+    }
+
+    public VisualItemResponse updatePin(long pinId, String title, String category, String description,
+            Long currentUserId, boolean isAdmin) {
+        VisualItemResponse item = adminPanelRepository.findById(pinId)
+                .orElseThrow(() -> new IllegalArgumentException("Pin not found"));
+
+        if (!isAdmin && (currentUserId == null || !currentUserId.equals(item.uploadedBy()))) {
+            throw new SecurityException("You are not authorized to edit this pin");
+        }
+        if (title == null || title.trim().isEmpty()) {
+            throw new IllegalArgumentException("Title is required");
+        }
+
+        adminPanelRepository.updateVisualItem(
+                pinId,
+                title.trim(),
+                category == null || category.trim().isEmpty() ? "General" : category.trim(),
+                description == null || description.trim().isEmpty() ? null : description.trim());
+        return adminPanelRepository.findById(pinId).orElseThrow(() -> new IllegalArgumentException("Pin not found"));
     }
 
     private String uploadToSupabaseStorage(byte[] fileBytes, String storagePath, String contentType) {
@@ -233,7 +252,8 @@ public class VisualItemService {
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 log.info("Successfully deleted image object from Supabase: {}", storagePath);
             } else {
-                log.warn("Supabase returned status {} when deleting {}: {}", response.statusCode(), storagePath, response.body());
+                log.warn("Supabase returned status {} when deleting {}: {}", response.statusCode(), storagePath,
+                        response.body());
             }
         } catch (Exception e) {
             log.error("Could not delete file from Supabase storage: {}", storagePath, e);
@@ -257,9 +277,12 @@ public class VisualItemService {
         if (originalFilename != null && originalFilename.lastIndexOf('.') >= 0) {
             return originalFilename.substring(originalFilename.lastIndexOf('.')).toLowerCase(Locale.ROOT);
         }
-        if ("image/png".equalsIgnoreCase(contentType)) return ".png";
-        if ("image/webp".equalsIgnoreCase(contentType)) return ".webp";
-        if ("image/avif".equalsIgnoreCase(contentType)) return ".avif";
+        if ("image/png".equalsIgnoreCase(contentType))
+            return ".png";
+        if ("image/webp".equalsIgnoreCase(contentType))
+            return ".webp";
+        if ("image/avif".equalsIgnoreCase(contentType))
+            return ".avif";
         return ".jpg";
     }
 }
