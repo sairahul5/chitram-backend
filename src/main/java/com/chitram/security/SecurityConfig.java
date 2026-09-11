@@ -23,8 +23,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
-            @Value("${FRONTEND_URL:http://localhost:3000}") String frontendUrl) throws Exception {
+            OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -66,7 +65,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfigurationSource corsConfigurationSource(
+            @Value("${FRONTEND_URL:http://localhost:3000}") String frontendUrl) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(frontendUrl));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
