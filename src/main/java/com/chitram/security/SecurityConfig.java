@@ -68,7 +68,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource(
             @Value("${FRONTEND_URL:http://localhost:3000}") String frontendUrl) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(frontendUrl.split(","))
+        configuration.setAllowedOriginPatterns(List.of(frontendUrl.split(","))
             .stream()
             .map(String::trim)
             .filter(origin -> !origin.isEmpty())
