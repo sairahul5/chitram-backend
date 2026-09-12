@@ -64,34 +64,51 @@ public class RecommendationRepository {
                     SELECT visual_item_id, COUNT(*) AS like_count
                     FROM pin_likes
                     GROUP BY visual_item_id
+                ), candidate_data AS (
+                    SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                           v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                           u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                           COALESCE(ls.like_count, 0) AS like_count,
+                           EXISTS (
+                               SELECT 1 FROM pin_likes current_like
+                               WHERE current_like.visual_item_id = v.id AND current_like.user_id = ?
+                           ) AS liked_by_current_user,
+                           COALESCE(ui.score, 0) AS interest_score,
+                           CASE WHEN EXISTS (
+                               SELECT 1 FROM user_follows uf
+                               WHERE uf.follower_id = ? AND uf.following_id = v.uploaded_by
+                           ) THEN 1 ELSE 0 END AS creator_score,
+                           COALESCE(ps.popularity_score, 0) AS popularity_score,
+                           EXP(-0.02 * EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - v.created_at)) / 3600.0) AS freshness_score
+                    FROM visual_items v
+                    LEFT JOIN users u ON u.id = v.uploaded_by
+                    LEFT JOIN user_interests ui ON ui.user_id = ? AND LOWER(ui.category) = LOWER(v.category)
+                    LEFT JOIN pin_stats ps ON ps.visual_item_id = v.id
+                    LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM user_interactions seen
+                        WHERE seen.user_id = ?
+                          AND seen.visual_item_id = v.id
+                          AND seen.interaction_type IN ('VIEW', 'SAVE', 'HIDE', 'REPORT')
+                    )
+                ), scored_candidates AS (
+                    SELECT candidate_data.*,
+                           CASE WHEN MAX(interest_score) OVER () <= 0 THEN 0
+                                ELSE GREATEST(0, LEAST(1, interest_score / MAX(interest_score) OVER ()))
+                           END * 0.45
+                           + creator_score * 0.20
+                           + CASE WHEN MAX(popularity_score) OVER () <= 0 THEN 0
+                                  ELSE GREATEST(0, LEAST(1, popularity_score / MAX(popularity_score) OVER ()))
+                             END * 0.20
+                           + freshness_score * 0.15 AS recommendation_score
+                    FROM candidate_data
                 )
-                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
-                       COALESCE(ls.like_count, 0) AS like_count,
-                       EXISTS (
-                           SELECT 1 FROM pin_likes current_like
-                           WHERE current_like.visual_item_id = v.id AND current_like.user_id = ?
-                       ) AS liked_by_current_user,
-                       COALESCE(ui.score, 0) AS interest_score,
-                       CASE WHEN EXISTS (
-                           SELECT 1 FROM user_follows uf
-                           WHERE uf.follower_id = ? AND uf.following_id = v.uploaded_by
-                       ) THEN 1 ELSE 0 END AS creator_score,
-                       COALESCE(ps.popularity_score, 0) AS popularity_score,
-                       EXP(-0.02 * EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - v.created_at)) / 3600.0) AS freshness_score
-                FROM visual_items v
-                LEFT JOIN users u ON u.id = v.uploaded_by
-                LEFT JOIN user_interests ui ON ui.user_id = ? AND LOWER(ui.category) = LOWER(v.category)
-                LEFT JOIN pin_stats ps ON ps.visual_item_id = v.id
-                LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM user_interactions seen
-                    WHERE seen.user_id = ?
-                      AND seen.visual_item_id = v.id
-                      AND seen.interaction_type IN ('VIEW', 'SAVE', 'HIDE', 'REPORT')
-                )
-                ORDER BY v.created_at DESC
+                SELECT id, title, category, image_url, image_path, width, height, aspect_ratio,
+                       file_size, mime_type, description, created_at, uploaded_by,
+                       creator_name, creator_username, creator_picture_url, like_count,
+                       liked_by_current_user, interest_score, creator_score, popularity_score, freshness_score
+                FROM scored_candidates
+                ORDER BY recommendation_score DESC, created_at DESC
                 LIMIT ?
                 """;
 
