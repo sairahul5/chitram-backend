@@ -11,8 +11,11 @@ import com.chitram.user.entity.UserAccount;
 import com.chitram.user.repository.UserAccountRepository;
 import com.chitram.user.repository.UserPanelRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 public class UserPanelService {
@@ -42,10 +45,16 @@ public class UserPanelService {
     }
 
     public List<UserSummaryResponse> searchUsers(String query) {
+        if (!adminPanelRepository.isPlatformSettingEnabled("public_profiles_enabled")) {
+            return List.of();
+        }
         return userPanelRepository.searchUsers(query);
     }
 
     public UserProfileDetailsResponse getProfile(Long userId) {
+        if (!adminPanelRepository.isPlatformSettingEnabled("public_profiles_enabled")) {
+            throw new ResponseStatusException(FORBIDDEN, "Public profiles are currently disabled");
+        }
         UserAccount account = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
 
