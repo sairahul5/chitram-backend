@@ -5,6 +5,8 @@ import com.chitram.recommendation.model.InteractionType;
 import com.chitram.recommendation.service.RecommendationService;
 import com.chitram.user.entity.UserAccount;
 import com.chitram.user.service.UserProfileService;
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,15 +41,21 @@ public class RecommendationController {
     }
 
     @PostMapping("/interactions")
-    public void recordInteraction(
+    public ResponseEntity<Void> recordInteraction(
             @AuthenticationPrincipal OAuth2User principal,
             @RequestBody InteractionRequest request) {
         UserAccount account = userProfileService.getCurrentUser(principal);
-        recommendationService.recordInteraction(
-                account.getId(),
-                request.pinId(),
-                InteractionType.valueOf(request.type().trim().toUpperCase()),
-                request.durationMs());
+        try {
+            recommendationService.recordInteraction(
+                    account.getId(),
+                    request.pinId(),
+                    InteractionType.valueOf(request.type().trim().toUpperCase()),
+                    request.durationMs());
+        } catch (DataAccessException exception) {
+            // Interaction tracking is optional and must not disrupt the gallery.
+            return ResponseEntity.accepted().build();
+        }
+        return ResponseEntity.noContent().build();
     }
 
     public record InteractionRequest(Long pinId, String type, Long durationMs) {
