@@ -114,9 +114,14 @@ public class AdminPanelService {
         adminPanelRepository.logAdminActivity(enabled ? "ENABLE_RECOMMENDATIONS" : "DISABLE_RECOMMENDATIONS", null);
     }
 
-    public java.util.Map<String, Boolean> getPlatformSettings() { return adminPanelRepository.getPlatformSettings(); }
+    public java.util.Map<String, Boolean> getPlatformSettings() {
+        java.util.Map<String, Boolean> settings = adminPanelRepository.getPlatformSettings();
+        java.util.Set<String> supported = java.util.Set.of("registration_enabled", "image_uploads_enabled", "public_profiles_enabled");
+        settings.keySet().removeIf(key -> !supported.contains(key));
+        return settings;
+    }
     public void setPlatformSetting(String key, boolean enabled) {
-        if (!java.util.Set.of("registration_enabled", "image_uploads_enabled", "comments_enabled", "public_profiles_enabled").contains(key)) {
+        if (!java.util.Set.of("registration_enabled", "image_uploads_enabled", "public_profiles_enabled").contains(key)) {
             throw new IllegalArgumentException("Unknown platform setting");
         }
         adminPanelRepository.setPlatformSetting(key, enabled);

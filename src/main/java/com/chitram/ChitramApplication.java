@@ -80,7 +80,7 @@ public class ChitramApplication {
                 jdbcTemplate.update(
                         "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
                         "recommendations_enabled");
-                for (String setting : new String[] { "registration_enabled", "image_uploads_enabled", "comments_enabled", "public_profiles_enabled" }) {
+                for (String setting : new String[] { "registration_enabled", "image_uploads_enabled", "public_profiles_enabled" }) {
                     jdbcTemplate.update(
                         "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
                         setting);
