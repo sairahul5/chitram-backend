@@ -63,12 +63,28 @@ public class AdminPanelRepository {
     }
 
     public int getSessionDurationDays() {
-        String value = jdbcTemplate.queryForObject("SELECT setting_value FROM app_settings WHERE setting_key = ?", String.class, "session_duration_days");
-        try { return value == null ? 30 : Integer.parseInt(value); } catch (NumberFormatException exception) { return 30; }
+        List<String> values = jdbcTemplate.query(
+                "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+                (resultSet, rowNumber) -> resultSet.getString("setting_value"),
+                "session_duration_days");
+        if (values.isEmpty() || values.get(0) == null) {
+            return 30;
+        }
+        try {
+            return Integer.parseInt(values.get(0));
+        } catch (NumberFormatException exception) {
+            return 30;
+        }
     }
 
     public void setSessionDurationDays(int days) {
-        jdbcTemplate.update("UPDATE app_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?", Integer.toString(days), "session_duration_days");
+        jdbcTemplate.update("""
+                INSERT INTO app_settings (setting_key, enabled, setting_value, updated_at)
+                VALUES (?, TRUE, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (setting_key) DO UPDATE SET
+                    setting_value = EXCLUDED.setting_value,
+                    updated_at = CURRENT_TIMESTAMP
+                """, "session_duration_days", Integer.toString(days));
     }
 
     public void logAdminActivity(String action, String target) {
