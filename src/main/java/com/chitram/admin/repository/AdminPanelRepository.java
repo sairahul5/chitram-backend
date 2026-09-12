@@ -312,7 +312,7 @@ public class AdminPanelRepository {
                                 FROM visual_items v
                                 LEFT JOIN users u ON u.id = v.uploaded_by
                         LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
-                                WHERE 1=1
+                                WHERE v.moderation_status = 'APPROVED'
                                 """);
 
         java.util.List<Object> params = new java.util.ArrayList<>();

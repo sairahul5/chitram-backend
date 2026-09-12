@@ -85,7 +85,8 @@ public class RecommendationRepository {
                     LEFT JOIN user_interests ui ON ui.user_id = ? AND LOWER(ui.category) = LOWER(v.category)
                     LEFT JOIN pin_stats ps ON ps.visual_item_id = v.id
                     LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
-                    WHERE NOT EXISTS (
+                                        WHERE v.moderation_status = 'APPROVED'
+                                            AND NOT EXISTS (
                         SELECT 1 FROM user_interactions seen
                         WHERE seen.user_id = ?
                           AND seen.visual_item_id = v.id
