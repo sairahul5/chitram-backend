@@ -151,26 +151,26 @@ public class AdminPanelRepository {
         boolean hasCursor = cursor != null && cursor > 0;
 
         StringBuilder sql = new StringBuilder(
-            """
-                WITH like_stats AS (
-                    SELECT visual_item_id, COUNT(*) AS like_count
-                    FROM pin_likes
-                    GROUP BY visual_item_id
-                )
-                        SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                               v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
-                       COALESCE(ls.like_count, 0) AS like_count,
-                       EXISTS (
-                       SELECT 1 FROM pin_likes current_like
-                       WHERE current_like.visual_item_id = v.id
-                         AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1)
-                       ) AS liked_by_current_user
-                        FROM visual_items v
-                        LEFT JOIN users u ON u.id = v.uploaded_by
-                LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
-                        WHERE 1=1
-                        """);
+                """
+                        WITH like_stats AS (
+                            SELECT visual_item_id, COUNT(*) AS like_count
+                            FROM pin_likes
+                            GROUP BY visual_item_id
+                        )
+                                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                               u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                               COALESCE(ls.like_count, 0) AS like_count,
+                               EXISTS (
+                               SELECT 1 FROM pin_likes current_like
+                               WHERE current_like.visual_item_id = v.id
+                                 AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1)
+                               ) AS liked_by_current_user
+                                FROM visual_items v
+                                LEFT JOIN users u ON u.id = v.uploaded_by
+                        LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
+                                WHERE 1=1
+                                """);
 
         java.util.List<Object> params = new java.util.ArrayList<>();
         params.add(currentUserId);

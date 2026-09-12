@@ -26,7 +26,7 @@ public class ChitramApplication {
                             PRIMARY KEY (user_id, visual_item_id)
                         )
                         """);
-                    jdbcTemplate.execute("""
+                jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS pin_likes (
                             id BIGSERIAL PRIMARY KEY,
                             user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -35,8 +35,8 @@ public class ChitramApplication {
                             CONSTRAINT uq_pin_likes_user_pin UNIQUE (user_id, visual_item_id)
                         )
                         """);
-                    jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_user ON pin_likes (user_id)");
-                    jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_pin ON pin_likes (visual_item_id)");
+                jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_user ON pin_likes (user_id)");
+                jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_pin ON pin_likes (visual_item_id)");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS user_interactions (
                             id BIGSERIAL PRIMARY KEY,

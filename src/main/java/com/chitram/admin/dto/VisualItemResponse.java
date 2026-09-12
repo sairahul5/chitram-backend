@@ -21,10 +21,10 @@ public record VisualItemResponse(
         String creatorUsername,
         String creatorPictureUrl,
         long likeCount,
-        boolean likedByCurrentUser
-) {
+        boolean likedByCurrentUser) {
     public VisualItemResponse(Long id, String title, String category, String imageUrl) {
-        this(id, title, category, imageUrl, null, 800, 1000, BigDecimal.valueOf(0.8000), null, null, null, null, null, null, null, null, 0, false);
+        this(id, title, category, imageUrl, null, 800, 1000, BigDecimal.valueOf(0.8000), null, null, null, null, null,
+                null, null, null, 0, false);
     }
 
     public VisualItemResponse(
