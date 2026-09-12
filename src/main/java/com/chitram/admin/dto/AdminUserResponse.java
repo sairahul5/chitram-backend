@@ -6,5 +6,10 @@ public record AdminUserResponse(
         String displayName,
         String pictureUrl,
         String role,
-        String createdAt) {
+        String createdAt,
+        String accountStatus,
+        long pins,
+        long likes,
+        long followers,
+        long following) {
 }

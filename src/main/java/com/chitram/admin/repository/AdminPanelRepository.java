@@ -6,6 +6,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.List;
 import com.chitram.admin.dto.AdminUserResponse;
 import com.chitram.admin.dto.VisualItemResponse;
+import com.chitram.admin.dto.AdminActivityResponse;
+import com.chitram.admin.dto.AdminCategoryResponse;
+import com.chitram.admin.dto.AdminReportResponse;
 
 @Repository
 public class AdminPanelRepository {
@@ -35,6 +38,27 @@ public class AdminPanelRepository {
                 "recommendations_enabled");
     }
 
+    public java.util.Map<String, Boolean> getPlatformSettings() {
+        return jdbcTemplate.query("SELECT setting_key, enabled FROM app_settings ORDER BY setting_key", rs -> {
+            java.util.Map<String, Boolean> values = new java.util.LinkedHashMap<>();
+            while (rs.next()) values.put(rs.getString("setting_key"), rs.getBoolean("enabled"));
+            return values;
+        });
+    }
+
+    public void setPlatformSetting(String key, boolean enabled) {
+        jdbcTemplate.update("UPDATE app_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?", enabled, key);
+    }
+
+    public void logAdminActivity(String action, String target) {
+        jdbcTemplate.update("INSERT INTO admin_activity_log (admin_name, action, target) VALUES (?, ?, ?)", "admin", action, target);
+    }
+
+    public List<AdminActivityResponse> findAdminActivity() {
+        return jdbcTemplate.query("SELECT action, target, created_at::text AS occurred_at FROM admin_activity_log ORDER BY created_at DESC LIMIT 50", (rs, row) ->
+                new AdminActivityResponse(rs.getString("action"), rs.getString("target"), rs.getString("occurred_at")));
+    }
+
     public long countUsers() {
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Long.class);
         return count == null ? 0 : count;
@@ -45,6 +69,51 @@ public class AdminPanelRepository {
                 "SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'",
                 Long.class);
         return count == null ? 0 : count;
+    }
+
+    public long countActiveUsers() {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT user_id) FROM user_interactions WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '30 days'",
+                Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public long countPinsCreatedToday() {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM visual_items WHERE created_at >= CURRENT_DATE",
+                Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public long countLikesToday() {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pin_likes WHERE created_at >= CURRENT_DATE",
+                Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public long countStorageBytes() {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(file_size), 0) FROM visual_items",
+                Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public List<AdminActivityResponse> findRecentActivity() {
+        return jdbcTemplate.query("""
+                SELECT action, target, occurred_at::text FROM (
+                    SELECT 'User joined' AS action, display_name AS target, created_at AS occurred_at FROM users
+                    UNION ALL
+                    SELECT 'New pin uploaded', title, created_at FROM visual_items
+                    UNION ALL
+                    SELECT 'Pin liked', CAST(visual_item_id AS TEXT), created_at FROM pin_likes
+                ) activity
+                ORDER BY occurred_at DESC
+                LIMIT 8
+                """, (resultSet, rowNumber) -> new AdminActivityResponse(
+                resultSet.getString("action"),
+                resultSet.getString("target"),
+                resultSet.getString("occurred_at")));
     }
 
     public long countRows(String tableName) {
@@ -71,16 +140,75 @@ public class AdminPanelRepository {
         return count != null && count > 0;
     }
 
-    public List<AdminUserResponse> findUsers() {
+    public List<AdminUserResponse> findUsers(String search) {
         return jdbcTemplate.query(
-                "SELECT u.id, u.email, u.display_name, u.picture_url, COALESCE(string_agg(r.code, ', ' ORDER BY r.code), 'USER') AS role, u.created_at::text FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id LEFT JOIN roles r ON r.id = ur.role_id GROUP BY u.id ORDER BY u.created_at DESC",
+                """
+                SELECT u.id, u.email, u.display_name, u.picture_url, u.created_at::text, u.account_status,
+                       COALESCE(string_agg(DISTINCT r.code, ', ' ORDER BY r.code), 'USER') AS role,
+                       (SELECT COUNT(*) FROM visual_items v WHERE v.uploaded_by = u.id) AS pins,
+                       (SELECT COUNT(*) FROM pin_likes pl WHERE pl.user_id = u.id) AS likes,
+                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers,
+                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.follower_id = u.id) AS following
+                FROM users u
+                LEFT JOIN user_roles ur ON ur.user_id = u.id
+                LEFT JOIN roles r ON r.id = ur.role_id
+                WHERE LOWER(u.display_name) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?) OR LOWER(COALESCE(u.username, '')) LIKE LOWER(?)
+                GROUP BY u.id ORDER BY u.created_at DESC
+                """,
                 (resultSet, rowNumber) -> new AdminUserResponse(
                         resultSet.getLong("id"),
                         resultSet.getString("email"),
                         resultSet.getString("display_name"),
                         resultSet.getString("picture_url"),
-                        resultSet.getString("role"),
-                        resultSet.getString("created_at")));
+                        resultSet.getString("role"), resultSet.getString("created_at"),
+                        resultSet.getString("account_status"), resultSet.getLong("pins"),
+                        resultSet.getLong("likes"), resultSet.getLong("followers"), resultSet.getLong("following")),
+                "%" + (search == null ? "" : search.trim()) + "%",
+                "%" + (search == null ? "" : search.trim()) + "%",
+                "%" + (search == null ? "" : search.trim()) + "%");
+    }
+
+    public void setAccountStatus(long userId, String status) {
+        jdbcTemplate.update("UPDATE users SET account_status = ? WHERE id = ?", status, userId);
+    }
+
+    public void deleteUser(long userId) {
+        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
+    }
+
+    public List<AdminCategoryResponse> findCategories() {
+        return jdbcTemplate.query("SELECT id, name, description, enabled FROM categories ORDER BY name", (rs, row) ->
+                new AdminCategoryResponse(rs.getLong("id"), rs.getString("name"), rs.getString("description"), rs.getBoolean("enabled")));
+    }
+
+    public void createCategory(String name, String description) {
+        jdbcTemplate.update("INSERT INTO categories (name, description) VALUES (?, ?)", name.trim(), description);
+    }
+
+    public void setCategoryEnabled(long id, boolean enabled) {
+        jdbcTemplate.update("UPDATE categories SET enabled = ? WHERE id = ?", enabled, id);
+    }
+
+    public void deleteCategory(long id) {
+        jdbcTemplate.update("DELETE FROM categories WHERE id = ?", id);
+    }
+
+    public List<AdminReportResponse> findReports() {
+        return jdbcTemplate.query("""
+                SELECT r.id, r.visual_item_id, COALESCE(u.username, u.email, 'Unknown') AS reported_by,
+                       r.reason, r.status, r.created_at::text
+                FROM reports r LEFT JOIN users u ON u.id = r.reported_by
+                ORDER BY r.created_at DESC LIMIT 100
+                """, (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getLong("visual_item_id"),
+                rs.getString("reported_by"), rs.getString("reason"), rs.getString("status"), rs.getString("created_at")));
+    }
+
+    public void setReportStatus(long reportId, String status) {
+        jdbcTemplate.update("UPDATE reports SET status = ? WHERE id = ?", status, reportId);
+    }
+
+    public void setModerationStatus(long pinId, String status) {
+        jdbcTemplate.update("UPDATE visual_items SET moderation_status = ? WHERE id = ?", status, pinId);
     }
 
     public void replaceRole(long userId, String role) {

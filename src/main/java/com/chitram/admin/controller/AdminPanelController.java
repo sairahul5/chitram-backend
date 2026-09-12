@@ -5,12 +5,15 @@ import com.chitram.admin.dto.AdminDashboardResponse;
 import com.chitram.admin.dto.AdminUserResponse;
 import com.chitram.admin.dto.RoleUpdateRequest;
 import com.chitram.admin.dto.VisualItemResponse;
+import com.chitram.admin.dto.AdminCategoryResponse;
+import com.chitram.admin.dto.AdminReportResponse;
 import com.chitram.admin.service.AdminPanelService;
 import com.chitram.admin.service.AdminAuthorizationService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -45,9 +48,9 @@ public class AdminPanelController {
     }
 
     @GetMapping("/users")
-    public List<AdminUserResponse> getUsers(@AuthenticationPrincipal OAuth2User user) {
+    public List<AdminUserResponse> getUsers(@AuthenticationPrincipal OAuth2User user, @RequestParam(required = false) String search) {
         requireAdmin(user);
-        return adminPanelService.getUsers();
+        return adminPanelService.searchUsers(search);
     }
 
     @PutMapping("/users/{userId}/role")
@@ -57,6 +60,48 @@ public class AdminPanelController {
             @RequestBody RoleUpdateRequest request) {
         requireAdmin(user);
         adminPanelService.updateUserRole(userId, request.role());
+    }
+
+    @PutMapping("/users/{userId}/status")
+    public void updateUserStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long userId, @RequestBody UserStatusRequest request) {
+        requireAdmin(user);
+        adminPanelService.setAccountStatus(userId, request.status());
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/users/{userId}")
+    public void deleteUser(@AuthenticationPrincipal OAuth2User user, @PathVariable long userId) {
+        requireAdmin(user);
+        adminPanelService.deleteUser(userId);
+    }
+
+    @GetMapping("/categories")
+    public List<AdminCategoryResponse> getCategories(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getCategories(); }
+
+    @PostMapping("/categories")
+    public AdminCategoryResponse createCategory(@AuthenticationPrincipal OAuth2User user, @RequestBody CategoryRequest request) {
+        requireAdmin(user); adminPanelService.createCategory(request.name(), request.description());
+        return adminPanelService.getCategories().stream().filter(category -> category.name().equalsIgnoreCase(request.name().trim())).findFirst().orElseThrow();
+    }
+
+    @PutMapping("/categories/{categoryId}/status")
+    public void updateCategoryStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long categoryId, @RequestBody EnabledRequest request) {
+        requireAdmin(user); adminPanelService.setCategoryEnabled(categoryId, request.enabled());
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/categories/{categoryId}")
+    public void deleteCategory(@AuthenticationPrincipal OAuth2User user, @PathVariable long categoryId) { requireAdmin(user); adminPanelService.deleteCategory(categoryId); }
+
+    @GetMapping("/reports")
+    public List<AdminReportResponse> getReports(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getReports(); }
+
+    @PutMapping("/reports/{reportId}/status")
+    public void updateReportStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long reportId, @RequestBody StatusRequest request) {
+        requireAdmin(user); adminPanelService.setReportStatus(reportId, request.status());
+    }
+
+    @PutMapping("/visual-items/{pinId}/moderation")
+    public void updateModerationStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long pinId, @RequestBody StatusRequest request) {
+        requireAdmin(user); adminPanelService.setModerationStatus(pinId, request.status());
     }
 
     @GetMapping("/visual-items")
@@ -82,10 +127,27 @@ public class AdminPanelController {
         return new RecommendationSettings(adminPanelService.areRecommendationsEnabled());
     }
 
+    @GetMapping("/settings/platform")
+    public java.util.Map<String, Boolean> getPlatformSettings(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getPlatformSettings(); }
+
+    @PutMapping("/settings/platform/{key}")
+    public void updatePlatformSetting(@AuthenticationPrincipal OAuth2User user, @PathVariable String key, @RequestBody EnabledRequest request) {
+        requireAdmin(user); adminPanelService.setPlatformSetting(key, request.enabled());
+    }
+
+    @GetMapping("/activity")
+    public List<com.chitram.admin.dto.AdminActivityResponse> getAdminActivity(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getAdminActivity(); }
+
     private void requireAdmin(OAuth2User user) {
         adminAuthorizationService.requireAdmin(user.getAttribute("email"));
     }
 
     public record RecommendationSettings(boolean enabled) {
     }
+
+    public record UserStatusRequest(String status) {
+    }
+    public record CategoryRequest(String name, String description) { }
+    public record EnabledRequest(boolean enabled) { }
+    public record StatusRequest(String status) { }
 }

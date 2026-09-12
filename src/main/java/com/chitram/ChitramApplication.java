@@ -80,6 +80,42 @@ public class ChitramApplication {
                 jdbcTemplate.update(
                         "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
                         "recommendations_enabled");
+                for (String setting : new String[] { "registration_enabled", "image_uploads_enabled", "comments_enabled", "public_profiles_enabled" }) {
+                    jdbcTemplate.update(
+                        "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
+                        setting);
+                }
+                jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS admin_activity_log (
+                        id BIGSERIAL PRIMARY KEY,
+                        admin_name VARCHAR(160) NOT NULL,
+                        action VARCHAR(120) NOT NULL,
+                        target VARCHAR(240),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+                jdbcTemplate.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
+                jdbcTemplate.execute(
+                    "ALTER TABLE visual_items ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED'");
+                jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS categories (
+                        id BIGSERIAL PRIMARY KEY,
+                        name VARCHAR(120) NOT NULL UNIQUE,
+                        description VARCHAR(500),
+                        enabled BOOLEAN NOT NULL DEFAULT TRUE
+                    )
+                    """);
+                jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS reports (
+                        id BIGSERIAL PRIMARY KEY,
+                        visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
+                        reported_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                        reason VARCHAR(120) NOT NULL,
+                        status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
                 jdbcTemplate.queryForObject("SELECT 1", Integer.class);
                 System.out.println("Chitram database connection successful");
             } catch (DataAccessException exception) {
