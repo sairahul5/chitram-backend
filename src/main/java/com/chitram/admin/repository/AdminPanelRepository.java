@@ -9,6 +9,7 @@ import com.chitram.admin.dto.VisualItemResponse;
 import com.chitram.admin.dto.AdminActivityResponse;
 import com.chitram.admin.dto.AdminCategoryResponse;
 import com.chitram.admin.dto.AdminReportResponse;
+import com.chitram.admin.dto.AdminTableResponse;
 
 @Repository
 public class AdminPanelRepository {
@@ -41,13 +42,15 @@ public class AdminPanelRepository {
     public java.util.Map<String, Boolean> getPlatformSettings() {
         return jdbcTemplate.query("SELECT setting_key, enabled FROM app_settings ORDER BY setting_key", rs -> {
             java.util.Map<String, Boolean> values = new java.util.LinkedHashMap<>();
-            while (rs.next()) values.put(rs.getString("setting_key"), rs.getBoolean("enabled"));
+            while (rs.next())
+                values.put(rs.getString("setting_key"), rs.getBoolean("enabled"));
             return values;
         });
     }
 
     public void setPlatformSetting(String key, boolean enabled) {
-        jdbcTemplate.update("UPDATE app_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?", enabled, key);
+        jdbcTemplate.update("UPDATE app_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?",
+                enabled, key);
     }
 
     public boolean isPlatformSettingEnabled(String key) {
@@ -59,12 +62,15 @@ public class AdminPanelRepository {
     }
 
     public void logAdminActivity(String action, String target) {
-        jdbcTemplate.update("INSERT INTO admin_activity_log (admin_name, action, target) VALUES (?, ?, ?)", "admin", action, target);
+        jdbcTemplate.update("INSERT INTO admin_activity_log (admin_name, action, target) VALUES (?, ?, ?)", "admin",
+                action, target);
     }
 
     public List<AdminActivityResponse> findAdminActivity() {
-        return jdbcTemplate.query("SELECT action, target, created_at::text AS occurred_at FROM admin_activity_log ORDER BY created_at DESC LIMIT 50", (rs, row) ->
-                new AdminActivityResponse(rs.getString("action"), rs.getString("target"), rs.getString("occurred_at")));
+        return jdbcTemplate.query(
+                "SELECT action, target, created_at::text AS occurred_at FROM admin_activity_log ORDER BY created_at DESC LIMIT 50",
+                (rs, row) -> new AdminActivityResponse(rs.getString("action"), rs.getString("target"),
+                        rs.getString("occurred_at")));
     }
 
     public long countUsers() {
@@ -140,6 +146,23 @@ public class AdminPanelRepository {
         return count != null && count > 0;
     }
 
+    public List<AdminTableResponse> findExistingTables() {
+        return jdbcTemplate.query(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
+                (resultSet, rowNumber) -> {
+                    String tableName = resultSet.getString("table_name");
+                    return new AdminTableResponse(tableName, countRowsExact(tableName), "Healthy");
+                });
+    }
+
+    private long countRowsExact(String tableName) {
+        if (!tableName.matches("[a-zA-Z0-9_]+")) {
+            return 0;
+        }
+        Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM \"" + tableName + "\"", Long.class);
+        return count == null ? 0 : count;
+    }
+
     public boolean isAdmin(String email) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE u.email = ? AND r.code = 'ADMIN'",
@@ -151,18 +174,18 @@ public class AdminPanelRepository {
     public List<AdminUserResponse> findUsers(String search) {
         return jdbcTemplate.query(
                 """
-                SELECT u.id, u.email, u.display_name, u.picture_url, u.created_at::text, u.account_status,
-                       COALESCE(string_agg(DISTINCT r.code, ', ' ORDER BY r.code), 'USER') AS role,
-                       (SELECT COUNT(*) FROM visual_items v WHERE v.uploaded_by = u.id) AS pins,
-                       (SELECT COUNT(*) FROM pin_likes pl WHERE pl.user_id = u.id) AS likes,
-                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers,
-                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.follower_id = u.id) AS following
-                FROM users u
-                LEFT JOIN user_roles ur ON ur.user_id = u.id
-                LEFT JOIN roles r ON r.id = ur.role_id
-                WHERE LOWER(u.display_name) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?) OR LOWER(COALESCE(u.username, '')) LIKE LOWER(?)
-                GROUP BY u.id ORDER BY u.created_at DESC
-                """,
+                        SELECT u.id, u.email, u.display_name, u.picture_url, u.created_at::text, u.account_status,
+                               COALESCE(string_agg(DISTINCT r.code, ', ' ORDER BY r.code), 'USER') AS role,
+                               (SELECT COUNT(*) FROM visual_items v WHERE v.uploaded_by = u.id) AS pins,
+                               (SELECT COUNT(*) FROM pin_likes pl WHERE pl.user_id = u.id) AS likes,
+                               (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers,
+                               (SELECT COUNT(*) FROM user_follows uf WHERE uf.follower_id = u.id) AS following
+                        FROM users u
+                        LEFT JOIN user_roles ur ON ur.user_id = u.id
+                        LEFT JOIN roles r ON r.id = ur.role_id
+                        WHERE LOWER(u.display_name) LIKE LOWER(?) OR LOWER(u.email) LIKE LOWER(?) OR LOWER(COALESCE(u.username, '')) LIKE LOWER(?)
+                        GROUP BY u.id ORDER BY u.created_at DESC
+                        """,
                 (resultSet, rowNumber) -> new AdminUserResponse(
                         resultSet.getLong("id"),
                         resultSet.getString("email"),
@@ -185,8 +208,9 @@ public class AdminPanelRepository {
     }
 
     public List<AdminCategoryResponse> findCategories() {
-        return jdbcTemplate.query("SELECT id, name, description, enabled FROM categories ORDER BY name", (rs, row) ->
-                new AdminCategoryResponse(rs.getLong("id"), rs.getString("name"), rs.getString("description"), rs.getBoolean("enabled")));
+        return jdbcTemplate.query("SELECT id, name, description, enabled FROM categories ORDER BY name",
+                (rs, row) -> new AdminCategoryResponse(rs.getLong("id"), rs.getString("name"),
+                        rs.getString("description"), rs.getBoolean("enabled")));
     }
 
     public void createCategory(String name, String description) {
@@ -208,7 +232,8 @@ public class AdminPanelRepository {
                 FROM reports r LEFT JOIN users u ON u.id = r.reported_by
                 ORDER BY r.created_at DESC LIMIT 100
                 """, (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getLong("visual_item_id"),
-                rs.getString("reported_by"), rs.getString("reason"), rs.getString("status"), rs.getString("created_at")));
+                rs.getString("reported_by"), rs.getString("reason"), rs.getString("status"),
+                rs.getString("created_at")));
     }
 
     public void setReportStatus(long reportId, String status) {

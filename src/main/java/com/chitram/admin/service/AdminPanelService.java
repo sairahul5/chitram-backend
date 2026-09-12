@@ -37,19 +37,14 @@ public class AdminPanelService {
         return new AdminDashboardResponse(
                 List.of(
                         new AdminMetricResponse("Active users", adminPanelRepository.countUsers()),
-                    new AdminMetricResponse("Total users", adminPanelRepository.countUsers()),
-                    new AdminMetricResponse("Total pins", countTableRows("visual_items")),
-                    new AdminMetricResponse("Pins today", adminPanelRepository.countPinsCreatedToday()),
-                    new AdminMetricResponse("Likes today", adminPanelRepository.countLikesToday()),
-                    new AdminMetricResponse("Reports pending", countTableRows("reports")),
-                    new AdminMetricResponse("Storage used (bytes)", adminPanelRepository.countStorageBytes())),
-                List.of(
-                        table("users"),
-                        table("oauth_accounts"),
-                        table("pins"),
-                        table("boards"),
-                        table("reports")),
-                    adminPanelRepository.findRecentActivity());
+                        new AdminMetricResponse("Total users", adminPanelRepository.countUsers()),
+                        new AdminMetricResponse("Total pins", countTableRows("visual_items")),
+                        new AdminMetricResponse("Pins today", adminPanelRepository.countPinsCreatedToday()),
+                        new AdminMetricResponse("Likes today", adminPanelRepository.countLikesToday()),
+                        new AdminMetricResponse("Reports pending", countTableRows("reports")),
+                        new AdminMetricResponse("Storage used (bytes)", adminPanelRepository.countStorageBytes())),
+                adminPanelRepository.findExistingTables(),
+                adminPanelRepository.findRecentActivity());
     }
 
     public List<AdminUserResponse> getUsers() {
@@ -71,16 +66,31 @@ public class AdminPanelService {
         adminPanelRepository.deleteUser(userId);
     }
 
-    public List<AdminCategoryResponse> getCategories() { return adminPanelRepository.findCategories(); }
+    public List<AdminCategoryResponse> getCategories() {
+        return adminPanelRepository.findCategories();
+    }
+
     public void createCategory(String name, String description) {
-        if (name == null || name.trim().isEmpty()) throw new IllegalArgumentException("Category name is required");
+        if (name == null || name.trim().isEmpty())
+            throw new IllegalArgumentException("Category name is required");
         adminPanelRepository.createCategory(name, description);
     }
-    public void setCategoryEnabled(long id, boolean enabled) { adminPanelRepository.setCategoryEnabled(id, enabled); }
-    public void deleteCategory(long id) { adminPanelRepository.deleteCategory(id); }
-    public List<AdminReportResponse> getReports() { return adminPanelRepository.findReports(); }
+
+    public void setCategoryEnabled(long id, boolean enabled) {
+        adminPanelRepository.setCategoryEnabled(id, enabled);
+    }
+
+    public void deleteCategory(long id) {
+        adminPanelRepository.deleteCategory(id);
+    }
+
+    public List<AdminReportResponse> getReports() {
+        return adminPanelRepository.findReports();
+    }
+
     public void setReportStatus(long id, String status) {
-        if (!List.of("PENDING", "RESOLVED").contains(status)) throw new IllegalArgumentException("Invalid report status");
+        if (!List.of("PENDING", "RESOLVED").contains(status))
+            throw new IllegalArgumentException("Invalid report status");
         adminPanelRepository.setReportStatus(id, status);
     }
 
@@ -116,18 +126,24 @@ public class AdminPanelService {
 
     public java.util.Map<String, Boolean> getPlatformSettings() {
         java.util.Map<String, Boolean> settings = adminPanelRepository.getPlatformSettings();
-        java.util.Set<String> supported = java.util.Set.of("registration_enabled", "image_uploads_enabled", "public_profiles_enabled");
+        java.util.Set<String> supported = java.util.Set.of("registration_enabled", "image_uploads_enabled",
+                "public_profiles_enabled");
         settings.keySet().removeIf(key -> !supported.contains(key));
         return settings;
     }
+
     public void setPlatformSetting(String key, boolean enabled) {
-        if (!java.util.Set.of("registration_enabled", "image_uploads_enabled", "public_profiles_enabled").contains(key)) {
+        if (!java.util.Set.of("registration_enabled", "image_uploads_enabled", "public_profiles_enabled")
+                .contains(key)) {
             throw new IllegalArgumentException("Unknown platform setting");
         }
         adminPanelRepository.setPlatformSetting(key, enabled);
         adminPanelRepository.logAdminActivity(enabled ? "ENABLE_SETTING" : "DISABLE_SETTING", key);
     }
-    public List<com.chitram.admin.dto.AdminActivityResponse> getAdminActivity() { return adminPanelRepository.findAdminActivity(); }
+
+    public List<com.chitram.admin.dto.AdminActivityResponse> getAdminActivity() {
+        return adminPanelRepository.findAdminActivity();
+    }
 
     private AdminTableResponse table(String tableName) {
         boolean exists = adminPanelRepository.tableExists(tableName);
