@@ -75,7 +75,7 @@ public class VisualItemController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public VisualItemResponse uploadVisualItem(
+    public ResponseEntity<?> uploadVisualItem(
             @AuthenticationPrincipal OAuth2User user,
             @RequestParam("title") String title,
             @RequestParam("category") String category,
@@ -83,6 +83,11 @@ public class VisualItemController {
             @RequestParam("image") MultipartFile image,
             @RequestParam(value = "width", required = false) Integer width,
             @RequestParam(value = "height", required = false) Integer height) {
+
+        if (!adminPanelRepository.isPlatformSettingEnabled("image_uploads_enabled")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Image uploads are currently disabled by the administrator"));
+        }
 
         Long uploadedBy = null;
         if (user != null) {
@@ -93,7 +98,7 @@ public class VisualItemController {
                         .orElse(null);
             }
         }
-        return visualItemService.upload(title, category, description, image, width, height, uploadedBy);
+        return ResponseEntity.ok(visualItemService.upload(title, category, description, image, width, height, uploadedBy));
     }
 
     @DeleteMapping("/{id}")

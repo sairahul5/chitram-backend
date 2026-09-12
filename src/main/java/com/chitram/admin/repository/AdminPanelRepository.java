@@ -50,6 +50,14 @@ public class AdminPanelRepository {
         jdbcTemplate.update("UPDATE app_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?", enabled, key);
     }
 
+    public boolean isPlatformSettingEnabled(String key) {
+        Boolean enabled = jdbcTemplate.queryForObject(
+                "SELECT enabled FROM app_settings WHERE setting_key = ?",
+                Boolean.class,
+                key);
+        return enabled == null || enabled;
+    }
+
     public void logAdminActivity(String action, String target) {
         jdbcTemplate.update("INSERT INTO admin_activity_log (admin_name, action, target) VALUES (?, ?, ?)", "admin", action, target);
     }
