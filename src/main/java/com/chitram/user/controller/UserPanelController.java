@@ -127,9 +127,9 @@ public class UserPanelController {
         return ResponseEntity.ok(Map.of("saved", false, "visualItemId", visualItemId));
     }
 
-    @GetMapping("/profile/{userId}")
-    public PublicProfileResponse getUserProfile(@PathVariable Long userId) {
-        UserProfileDetailsResponse profile = userPanelService.getProfile(userId);
+    @GetMapping("/profile/{usernameOrId}")
+    public PublicProfileResponse getUserProfile(@PathVariable String usernameOrId) {
+        UserProfileDetailsResponse profile = userPanelService.getProfile(usernameOrId);
         return new PublicProfileResponse(
                 profile.id(),
                 profile.name(),

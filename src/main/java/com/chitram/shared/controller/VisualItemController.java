@@ -47,6 +47,13 @@ public class VisualItemController {
         return adminPanelRepository.findVisualItems(query);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<VisualItemResponse> getVisualItem(@PathVariable Long id) {
+        return adminPanelRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/feed")
     public VisualFeedResponse getFeed(
             @RequestParam(required = false) Long cursor,

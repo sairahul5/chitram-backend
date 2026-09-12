@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 
@@ -51,12 +52,24 @@ public class UserPanelService {
         return userPanelRepository.searchUsers(query);
     }
 
-    public UserProfileDetailsResponse getProfile(Long userId) {
+    @SuppressWarnings("null")
+    public UserProfileDetailsResponse getProfile(String usernameOrId) {
         if (!adminPanelRepository.isPlatformSettingEnabled("public_profiles_enabled")) {
             throw new ResponseStatusException(FORBIDDEN, "Public profiles are currently disabled");
         }
-        UserAccount account = userAccountRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+        Optional<UserAccount> accountResult = userAccountRepository.findByUsername(usernameOrId.trim().toLowerCase());
+        if (accountResult.isEmpty()) {
+            try {
+                accountResult = userAccountRepository.findById(Long.valueOf(usernameOrId));
+            } catch (NumberFormatException exception) {
+                accountResult = Optional.empty();
+            }
+        }
+        if (accountResult.isEmpty()) {
+            throw new IllegalArgumentException("User not found: " + usernameOrId);
+        }
+        UserAccount account = accountResult.get();
+        Long userId = account.getId();
 
         long followersCount = userPanelRepository.countFollowers(userId);
         long followingCount = userPanelRepository.countFollowing(userId);
@@ -75,6 +88,10 @@ public class UserPanelService {
                 creationsCount,
                 creations,
                 isAdmin);
+    }
+
+    public UserProfileDetailsResponse getProfile(Long userId) {
+        return getProfile(String.valueOf(userId));
     }
 
     public List<VisualItemResponse> getAllCreations() {
