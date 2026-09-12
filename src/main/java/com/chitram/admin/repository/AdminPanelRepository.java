@@ -190,13 +190,6 @@ public class AdminPanelRepository {
                 });
     }
 
-    public long getTotalRowCount() {
-        Long total = jdbcTemplate.queryForObject(
-                "SELECT COALESCE(SUM(n_live_tup), 0) FROM pg_stat_user_tables WHERE schemaname = 'public'",
-                Long.class);
-        return total == null ? 0 : total;
-    }
-
     private long countRowsExact(String tableName) {
         if (!tableName.matches("[a-zA-Z0-9_]+")) {
             return 0;
@@ -271,9 +264,9 @@ public class AdminPanelRepository {
         return jdbcTemplate.query("""
                   SELECT r.id, COALESCE(r.target_type, 'PIN') AS target_type,
                       COALESCE(r.target_id, r.visual_item_id) AS target_id,
-                      COALESCE(u.username, u.email, 'Unknown') AS reported_by,
+                        COALESCE(reporter.username, reporter.email, 'Unknown') AS reported_by,
                       r.reason, r.description, r.status, r.created_at::text
-                FROM reports r LEFT JOIN users u ON u.id = r.reported_by
+                    FROM reports r LEFT JOIN users reporter ON reporter.id = COALESCE(r.reporter_id, r.reported_by)
                 ORDER BY r.created_at DESC LIMIT 100
                 """, (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getString("target_type"),
                 rs.getLong("target_id"), rs.getString("reported_by"), rs.getString("reason"),
@@ -284,9 +277,9 @@ public class AdminPanelRepository {
         StringBuilder sql = new StringBuilder("""
                 SELECT r.id, COALESCE(r.target_type, 'PIN') AS target_type,
                     COALESCE(r.target_id, r.visual_item_id) AS target_id,
-                    COALESCE(u.username, u.email, 'Unknown') AS reported_by,
+                    COALESCE(reporter.username, reporter.email, 'Unknown') AS reported_by,
                     r.reason, r.description, r.status, r.created_at::text
-                FROM reports r LEFT JOIN users u ON u.id = r.reported_by
+                FROM reports r LEFT JOIN users reporter ON reporter.id = COALESCE(r.reporter_id, r.reported_by)
                 WHERE 1=1
                 """);
         java.util.List<Object> params = new java.util.ArrayList<>();
@@ -304,8 +297,12 @@ public class AdminPanelRepository {
                 rs.getString("description"), rs.getString("status"), rs.getString("created_at")), params.toArray());
     }
 
-    public void setReportStatus(long reportId, String status) {
-        jdbcTemplate.update("UPDATE reports SET status = ? WHERE id = ?", status, reportId);
+    public void setReportStatus(long reportId, String status, String adminEmail) {
+        jdbcTemplate.update("""
+                UPDATE reports SET status = ?, reviewed_at = CURRENT_TIMESTAMP,
+                    reviewed_by = (SELECT id FROM users WHERE email = ?)
+                WHERE id = ?
+                """, status, adminEmail, reportId);
     }
 
     public void setModerationStatus(long pinId, String status) {

@@ -4,13 +4,13 @@ import com.chitram.admin.dto.AdminPanelResponse;
 import com.chitram.admin.repository.AdminPanelRepository;
 import com.chitram.admin.dto.AdminDashboardResponse;
 import com.chitram.admin.dto.AdminMetricResponse;
-import com.chitram.admin.dto.AdminTableResponse;
 import com.chitram.admin.dto.AdminUserResponse;
 import com.chitram.admin.dto.VisualItemResponse;
 import com.chitram.websocket.AdminEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.Instant;
 import com.chitram.admin.dto.AdminCategoryResponse;
 import com.chitram.admin.dto.AdminReportResponse;
 import com.chitram.admin.dto.AdminActivityResponse;
@@ -95,10 +95,10 @@ public class AdminPanelService {
         return adminPanelRepository.findReportsFiltered(status, targetType);
     }
 
-    public void setReportStatus(long id, String status) {
+    public void setReportStatus(long id, String status, String adminEmail) {
         if (!List.of("PENDING", "REVIEWING", "RESOLVED", "DISMISSED").contains(status))
             throw new IllegalArgumentException("Invalid report status");
-        adminPanelRepository.setReportStatus(id, status);
+        adminPanelRepository.setReportStatus(id, status, adminEmail);
     }
 
     public void setModerationStatus(long pinId, String status) {
@@ -163,23 +163,20 @@ public class AdminPanelService {
     }
 
     public DatabaseOverviewResponse getDatabaseOverview() {
-        boolean healthy = adminPanelRepository.checkDatabaseHealth();
-        String status = healthy ? "CONNECTED" : "ERROR";
-        List<DatabaseTableInfo> tables = adminPanelRepository.getDatabaseTableInfo();
-        long totalRows = adminPanelRepository.getTotalRowCount();
-        return new DatabaseOverviewResponse(
-                status,
-                tables.size(),
-                totalRows,
-                tables);
-    }
+        if (!adminPanelRepository.checkDatabaseHealth()) {
+            return new DatabaseOverviewResponse("ERROR", 0, 0, List.of(), Instant.now());
+        }
 
-    private AdminTableResponse table(String tableName) {
-        boolean exists = adminPanelRepository.tableExists(tableName);
-        return new AdminTableResponse(
-                tableName,
-                exists ? adminPanelRepository.countRows(tableName) : 0,
-                exists ? "Healthy" : "Planned");
+        try {
+            List<DatabaseTableInfo> tables = adminPanelRepository.getDatabaseTableInfo();
+            long totalRows = 0;
+            for (DatabaseTableInfo table : tables) {
+                totalRows += table.rowCount();
+            }
+            return new DatabaseOverviewResponse("CONNECTED", tables.size(), totalRows, tables, Instant.now());
+        } catch (RuntimeException exception) {
+            return new DatabaseOverviewResponse("ERROR", 0, 0, List.of(), Instant.now());
+        }
     }
 
     private long countTableRows(String tableName) {

@@ -122,7 +122,7 @@ public class AdminPanelController {
     public void updateReportStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long reportId,
             @RequestBody StatusRequest request) {
         requireAdmin(user);
-        adminPanelService.setReportStatus(reportId, request.status());
+        adminPanelService.setReportStatus(reportId, request.status(), user.getAttribute("email"));
     }
 
     @PutMapping("/visual-items/{pinId}/moderation")
@@ -215,5 +215,5 @@ public class AdminPanelController {
     public record StatusRequest(String status) {
     }
 
-    public record SessionDuration(int sessionDurationDays) { }
+    public record SessionDuration(Integer sessionDurationDays) { }
 }

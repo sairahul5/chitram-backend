@@ -36,7 +36,9 @@ public class ReportController {
         UserAccount reporter = userProfileService.getCurrentUser(principal);
         String targetType = request.targetType() == null ? "" : request.targetType().trim().toUpperCase();
         String reason = request.reason() == null ? "" : request.reason().trim().toUpperCase();
-        if (!TARGET_TYPES.contains(targetType) || !REASONS.contains(reason) || request.targetId() == null) {
+        String description = request.description() == null ? null : request.description().trim();
+        if (!TARGET_TYPES.contains(targetType) || !REASONS.contains(reason) || request.targetId() == null
+            || request.targetId() <= 0 || (description != null && description.length() > 1000)) {
             throw new IllegalArgumentException("Invalid report target or reason");
         }
         if ("USER".equals(targetType) && reporter.getId().equals(request.targetId())) {
@@ -51,7 +53,7 @@ public class ReportController {
             return ResponseEntity.accepted().build();
         }
         jdbcTemplate.update("INSERT INTO reports (visual_item_id, reported_by, target_type, target_id, reporter_id, reason, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                "PIN".equals(targetType) ? request.targetId() : null, reporter.getId(), targetType, request.targetId(), reporter.getId(), reason, request.description());
+            "PIN".equals(targetType) ? request.targetId() : null, reporter.getId(), targetType, request.targetId(), reporter.getId(), reason, description);
         if ("PIN".equals(targetType)) {
             recommendationService.recordInteraction(reporter.getId(), request.targetId(), InteractionType.REPORT, null);
         }

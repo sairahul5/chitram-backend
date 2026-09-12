@@ -24,11 +24,10 @@ public class RecommendationService {
     }
 
     public void recordInteraction(long userId, long pinId, InteractionType type, Long durationMs) {
-        if (!adminPanelRepository.areRecommendationsEnabled()) {
-            return;
-        }
         recommendationRepository.recordInteraction(userId, pinId, type, durationMs);
-        recommendationRepository.updateInterest(userId, pinId, type.weight());
+        if (adminPanelRepository.areRecommendationsEnabled()) {
+            recommendationRepository.updateInterest(userId, pinId, type.weight());
+        }
     }
 
     public List<VisualItemResponse> getRecommendations(long userId, int limit) {
