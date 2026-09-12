@@ -8,8 +8,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Pushes a fresh dashboard snapshot to all connected admin clients every 10 seconds.
- * This keeps metrics (user counts, image counts, etc.) live without any user action.
+ * Pushes a fresh dashboard snapshot to all connected admin clients every 10
+ * seconds.
+ * This keeps metrics (user counts, image counts, etc.) live without any user
+ * action.
  */
 @Component
 @EnableScheduling
@@ -27,6 +29,9 @@ public class AdminScheduler {
 
     @Scheduled(fixedDelay = 10_000)
     public void pushDashboardUpdate() {
+        if (!adminEventPublisher.hasConnectedClients()) {
+            return;
+        }
         try {
             adminEventPublisher.publishDashboard(adminPanelService.getDashboard());
         } catch (Exception e) {

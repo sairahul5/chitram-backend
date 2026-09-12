@@ -215,5 +215,6 @@ public class AdminPanelController {
     public record StatusRequest(String status) {
     }
 
-    public record SessionDuration(Integer sessionDurationDays) { }
+    public record SessionDuration(Integer sessionDurationDays) {
+    }
 }

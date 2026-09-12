@@ -6,13 +6,15 @@ import com.chitram.admin.dto.VisualItemResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.user.SimpUserRegistry;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 /**
  * Central publisher for all admin-panel WebSocket events.
- * Inject this service into any component that mutates data the admin panel displays.
+ * Inject this service into any component that mutates data the admin panel
+ * displays.
  */
 @Service
 public class AdminEventPublisher {
@@ -21,14 +23,20 @@ public class AdminEventPublisher {
 
     // Topic destinations — frontend subscribes to these
     public static final String TOPIC_DASHBOARD = "/topic/admin/dashboard";
-    public static final String TOPIC_USERS     = "/topic/admin/users";
+    public static final String TOPIC_USERS = "/topic/admin/users";
     public static final String TOPIC_IMAGE_NEW = "/topic/admin/images/new";
     public static final String TOPIC_IMAGE_DEL = "/topic/admin/images/deleted";
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final SimpUserRegistry userRegistry;
 
-    public AdminEventPublisher(SimpMessagingTemplate messagingTemplate) {
+    public AdminEventPublisher(SimpMessagingTemplate messagingTemplate, SimpUserRegistry userRegistry) {
         this.messagingTemplate = messagingTemplate;
+        this.userRegistry = userRegistry;
+    }
+
+    public boolean hasConnectedClients() {
+        return !userRegistry.getUsers().isEmpty();
     }
 
     /** Broadcast a fresh dashboard snapshot to all connected admin clients. */

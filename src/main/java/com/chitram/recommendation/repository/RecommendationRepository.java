@@ -46,30 +46,12 @@ public class RecommendationRepository {
 
     public List<RecommendationCandidate> findCandidates(long userId, int limit) {
         String sql = """
-                WITH pin_stats AS (
-                    SELECT visual_item_id,
-                           COALESCE(SUM(CASE interaction_type
-                               WHEN 'VIEW' THEN 1
-                               WHEN 'LONG_VIEW' THEN 2
-                               WHEN 'CLICK' THEN 3
-                               WHEN 'LIKE' THEN 5
-                               WHEN 'SAVE' THEN 8
-                               WHEN 'SHARE' THEN 10
-                               WHEN 'HIDE' THEN -10
-                               WHEN 'REPORT' THEN -20
-                               ELSE 0 END), 0) AS popularity_score
-                    FROM user_interactions
-                    GROUP BY visual_item_id
-                ), like_stats AS (
-                    SELECT visual_item_id, COUNT(*) AS like_count
-                    FROM pin_likes
-                    GROUP BY visual_item_id
-                ), candidate_data AS (
+                WITH candidate_data AS (
                           SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                            v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
                               v.share_key,
                            u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
-                           COALESCE(ls.like_count, 0) AS like_count,
+                           (SELECT COUNT(*) FROM pin_likes item_likes WHERE item_likes.visual_item_id = v.id) AS like_count,
                            EXISTS (
                                SELECT 1 FROM pin_likes current_like
                                WHERE current_like.visual_item_id = v.id AND current_like.user_id = ?
@@ -79,14 +61,29 @@ public class RecommendationRepository {
                                SELECT 1 FROM user_follows uf
                                WHERE uf.follower_id = ? AND uf.following_id = v.uploaded_by
                            ) THEN 1 ELSE 0 END AS creator_score,
-                           COALESCE(ps.popularity_score, 0) AS popularity_score,
+                           COALESCE((SELECT SUM(CASE interaction_type
+                               WHEN 'VIEW' THEN 1
+                               WHEN 'LONG_VIEW' THEN 2
+                               WHEN 'CLICK' THEN 3
+                               WHEN 'LIKE' THEN 5
+                               WHEN 'SAVE' THEN 8
+                               WHEN 'SHARE' THEN 10
+                               WHEN 'HIDE' THEN -10
+                               WHEN 'REPORT' THEN -20
+                               ELSE 0 END)
+                               FROM user_interactions pin_interactions
+                               WHERE pin_interactions.visual_item_id = v.id), 0) AS popularity_score,
                            EXP(-0.02 * EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - v.created_at)) / 3600.0) AS freshness_score
-                    FROM visual_items v
+                    FROM (
+                        SELECT v.*
+                        FROM visual_items v
+                        WHERE COALESCE(v.moderation_status, 'APPROVED') = 'APPROVED'
+                        ORDER BY v.created_at DESC
+                        LIMIT 500
+                    ) v
                     LEFT JOIN users u ON u.id = v.uploaded_by
                     LEFT JOIN user_interests ui ON ui.user_id = ? AND LOWER(ui.category) = LOWER(v.category)
-                    LEFT JOIN pin_stats ps ON ps.visual_item_id = v.id
-                    LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
-                                        WHERE COALESCE(v.moderation_status, 'APPROVED') = 'APPROVED'
+                                        WHERE
                                             AND NOT EXISTS (
                         SELECT 1 FROM user_interactions seen
                         WHERE seen.user_id = ?
@@ -107,6 +104,7 @@ public class RecommendationRepository {
                 )
                 SELECT id, title, category, image_url, image_path, width, height, aspect_ratio,
                        file_size, mime_type, description, created_at, uploaded_by,
+                      share_key,
                        creator_name, creator_username, creator_picture_url, like_count,
                        liked_by_current_user, interest_score, creator_score, popularity_score, freshness_score
                 FROM scored_candidates

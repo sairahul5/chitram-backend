@@ -38,6 +38,17 @@ public class ChitramApplication {
                         """);
                 jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_user ON pin_likes (user_id)");
                 jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_pin ON pin_likes (visual_item_id)");
+                jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_created ON pin_likes (created_at)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_visual_items_feed ON visual_items (moderation_status, id DESC)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_visual_items_creator ON visual_items (uploaded_by, id DESC)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_saved_pins_user_created ON saved_pins (user_id, created_at DESC)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_follows_following_created ON user_follows (following_id, created_at DESC)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_follows_follower_created ON user_follows (follower_id, created_at DESC)");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS user_interactions (
                             id BIGSERIAL PRIMARY KEY,
@@ -71,6 +82,10 @@ public class ChitramApplication {
                         "CREATE INDEX IF NOT EXISTS idx_user_interactions_user_pin ON user_interactions (user_id, visual_item_id)");
                 jdbcTemplate.execute(
                         "CREATE INDEX IF NOT EXISTS idx_user_interactions_pin ON user_interactions (visual_item_id)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_user_interactions_created ON user_interactions (created_at)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_user_interactions_user_pin_type ON user_interactions (user_id, visual_item_id, interaction_type)");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS app_settings (
                             setting_key VARCHAR(120) PRIMARY KEY,
@@ -79,7 +94,7 @@ public class ChitramApplication {
                             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         )
                         """);
-                                jdbcTemplate.execute("ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS setting_value VARCHAR(120)");
+                jdbcTemplate.execute("ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS setting_value VARCHAR(120)");
                 jdbcTemplate.update(
                         "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
                         "recommendations_enabled");
@@ -110,7 +125,8 @@ public class ChitramApplication {
                     jdbcTemplate.update("UPDATE visual_items SET share_key = ? WHERE id = ?",
                             UUID.randomUUID().toString(), resultSet.getLong("id"));
                 });
-                jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_visual_items_share_key ON visual_items (share_key)");
+                jdbcTemplate.execute(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_visual_items_share_key ON visual_items (share_key)");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS categories (
                             id BIGSERIAL PRIMARY KEY,
@@ -129,14 +145,20 @@ public class ChitramApplication {
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         )
                         """);
-                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_type VARCHAR(20) NOT NULL DEFAULT 'PIN'");
+                jdbcTemplate.execute(
+                        "ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_type VARCHAR(20) NOT NULL DEFAULT 'PIN'");
                 jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_id BIGINT");
-                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS reporter_id BIGINT REFERENCES users(id) ON DELETE SET NULL");
+                jdbcTemplate.execute(
+                        "ALTER TABLE reports ADD COLUMN IF NOT EXISTS reporter_id BIGINT REFERENCES users(id) ON DELETE SET NULL");
                 jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS description VARCHAR(1000)");
                 jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
-                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL");
+                jdbcTemplate.execute(
+                        "ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL");
                 jdbcTemplate.execute("ALTER TABLE reports ALTER COLUMN visual_item_id DROP NOT NULL");
-                jdbcTemplate.execute("UPDATE reports SET target_id = visual_item_id, reporter_id = reported_by WHERE target_id IS NULL");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_reports_status_created ON reports (status, created_at DESC)");
+                jdbcTemplate.execute(
+                        "UPDATE reports SET target_id = visual_item_id, reporter_id = reported_by WHERE target_id IS NULL");
                 jdbcTemplate.queryForObject("SELECT 1", Integer.class);
                 System.out.println("Chitram database connection successful");
             } catch (DataAccessException exception) {

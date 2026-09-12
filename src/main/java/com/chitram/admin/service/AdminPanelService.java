@@ -119,7 +119,7 @@ public class AdminPanelService {
     }
 
     public List<VisualItemResponse> getVisualItems(String query) {
-        return adminPanelRepository.findVisualItems(query);
+        return adminPanelRepository.findVisualItems(query, 12);
     }
 
     public boolean areRecommendationsEnabled() {
@@ -152,7 +152,9 @@ public class AdminPanelService {
         return adminPanelRepository.findAdminActivity();
     }
 
-    public int getSessionDurationDays() { return adminPanelRepository.getSessionDurationDays(); }
+    public int getSessionDurationDays() {
+        return adminPanelRepository.getSessionDurationDays();
+    }
 
     public void setSessionDurationDays(int days) {
         if (!java.util.Set.of(7, 30, 90, 365).contains(days)) {

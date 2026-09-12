@@ -140,26 +140,28 @@ public class AdminPanelRepository {
     }
 
     public List<AdminActivityResponse> findRecentActivity() {
-        return jdbcTemplate.query("""
-                SELECT action, target, occurred_at::text FROM (
-                    SELECT 'User joined' AS action, display_name AS target, created_at AS occurred_at FROM users
-                    UNION ALL
-                    SELECT 'New pin uploaded', title, created_at FROM visual_items
-                    UNION ALL
-                    SELECT 'Pin liked', CAST(visual_item_id AS TEXT), created_at FROM pin_likes
-                    UNION ALL
-                    SELECT 'Pin reported', COALESCE(target_type, 'PIN') || ' #' || COALESCE(target_id, visual_item_id), created_at FROM reports
-                    UNION ALL
-                    SELECT 'Pin saved', CAST(visual_item_id AS TEXT), created_at FROM saved_pins
-                    UNION ALL
-                    SELECT action, COALESCE(target, 'Platform'), created_at FROM admin_activity_log
-                ) activity
-                ORDER BY occurred_at DESC
-                LIMIT 8
-                """, (resultSet, rowNumber) -> new AdminActivityResponse(
-                resultSet.getString("action"),
-                resultSet.getString("target"),
-                resultSet.getString("occurred_at")));
+        return jdbcTemplate.query(
+                """
+                        SELECT action, target, occurred_at::text FROM (
+                            SELECT 'User joined' AS action, display_name AS target, created_at AS occurred_at FROM users
+                            UNION ALL
+                            SELECT 'New pin uploaded', title, created_at FROM visual_items
+                            UNION ALL
+                            SELECT 'Pin liked', CAST(visual_item_id AS TEXT), created_at FROM pin_likes
+                            UNION ALL
+                            SELECT 'Pin reported', COALESCE(target_type, 'PIN') || ' #' || COALESCE(target_id, visual_item_id), created_at FROM reports
+                            UNION ALL
+                            SELECT 'Pin saved', CAST(visual_item_id AS TEXT), created_at FROM saved_pins
+                            UNION ALL
+                            SELECT action, COALESCE(target, 'Platform'), created_at FROM admin_activity_log
+                        ) activity
+                        ORDER BY occurred_at DESC
+                        LIMIT 8
+                        """,
+                (resultSet, rowNumber) -> new AdminActivityResponse(
+                        resultSet.getString("action"),
+                        resultSet.getString("target"),
+                        resultSet.getString("occurred_at")));
     }
 
     public long countRows(String tableName) {
@@ -308,9 +310,11 @@ public class AdminPanelRepository {
             params.add(targetType.toUpperCase());
         }
         sql.append(" ORDER BY r.created_at DESC LIMIT 100");
-        return jdbcTemplate.query(sql.toString(), (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getString("target_type"),
-                rs.getLong("target_id"), rs.getString("reported_by"), rs.getString("reason"),
-                rs.getString("description"), rs.getString("status"), rs.getString("created_at")), params.toArray());
+        return jdbcTemplate.query(sql.toString(),
+                (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getString("target_type"),
+                        rs.getLong("target_id"), rs.getString("reported_by"), rs.getString("reason"),
+                        rs.getString("description"), rs.getString("status"), rs.getString("created_at")),
+                params.toArray());
     }
 
     public void setReportStatus(long reportId, String status, String adminEmail) {
@@ -392,7 +396,12 @@ public class AdminPanelRepository {
     };
 
     public List<VisualItemResponse> findVisualItems(String query) {
+        return findVisualItems(query, 100);
+    }
+
+    public List<VisualItemResponse> findVisualItems(String query, int limit) {
         String search = query == null ? "" : query.trim();
+        int safeLimit = Math.max(1, Math.min(limit, 100));
         String sql = """
                   SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
@@ -402,8 +411,9 @@ public class AdminPanelRepository {
                 LEFT JOIN users u ON u.id = v.uploaded_by
                 WHERE LOWER(v.title) LIKE LOWER(?) OR LOWER(v.category) LIKE LOWER(?)
                 ORDER BY v.id DESC
+                LIMIT ?
                 """;
-        return jdbcTemplate.query(sql, visualItemRowMapper, "%" + search + "%", "%" + search + "%");
+        return jdbcTemplate.query(sql, visualItemRowMapper, "%" + search + "%", "%" + search + "%", safeLimit);
     }
 
     public List<VisualItemResponse> findFeed(String query, Long cursor, int limit, Long currentUserId) {
@@ -414,26 +424,20 @@ public class AdminPanelRepository {
 
         StringBuilder sql = new StringBuilder(
                 """
-                        WITH like_stats AS (
-                            SELECT visual_item_id, COUNT(*) AS like_count
-                            FROM pin_likes
-                            GROUP BY visual_item_id
-                        )
-                                    SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
-                                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                                   v.share_key,
-                               u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
-                               COALESCE(ls.like_count, 0) AS like_count,
-                               EXISTS (
-                               SELECT 1 FROM pin_likes current_like
-                               WHERE current_like.visual_item_id = v.id
-                                 AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1)
-                               ) AS liked_by_current_user
-                                FROM visual_items v
-                                LEFT JOIN users u ON u.id = v.uploaded_by
-                        LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
-                                WHERE v.moderation_status = 'APPROVED'
-                                """);
+                        SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                                           v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                                       v.share_key,
+                                   u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                           (SELECT COUNT(*) FROM pin_likes item_likes WHERE item_likes.visual_item_id = v.id) AS like_count,
+                                   EXISTS (
+                                   SELECT 1 FROM pin_likes current_like
+                                   WHERE current_like.visual_item_id = v.id
+                                     AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1)
+                                   ) AS liked_by_current_user
+                                    FROM visual_items v
+                                    LEFT JOIN users u ON u.id = v.uploaded_by
+                                    WHERE v.moderation_status = 'APPROVED'
+                                    """);
 
         java.util.List<Object> params = new java.util.ArrayList<>();
         params.add(currentUserId);
