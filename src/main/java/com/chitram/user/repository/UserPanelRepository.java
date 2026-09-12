@@ -69,12 +69,19 @@ public class UserPanelRepository {
 
     public List<VisualItemResponse> findSavedPinsByUserId(long userId) {
         String sql = """
+                  WITH like_stats AS (
+                      SELECT visual_item_id, COUNT(*) AS like_count
+                      FROM pin_likes
+                      GROUP BY visual_item_id
+                  )
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                          u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                          COALESCE(ls.like_count, 0) AS like_count
                 FROM saved_pins s
                 JOIN visual_items v ON v.id = s.visual_item_id
                 LEFT JOIN users u ON u.id = v.uploaded_by
+                  LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
                 WHERE s.user_id = ?
                 ORDER BY s.created_at DESC
                 """;
@@ -131,16 +138,25 @@ public class UserPanelRepository {
                 uploadedBy,
                 resultSet.getString("creator_name"),
                 resultSet.getString("creator_username"),
-                resultSet.getString("creator_picture_url"));
+                resultSet.getString("creator_picture_url"),
+                resultSet.getLong("like_count"),
+                false);
     };
 
     public List<VisualItemResponse> findCreationsByUserId(long userId) {
         String sql = """
+                  WITH like_stats AS (
+                      SELECT visual_item_id, COUNT(*) AS like_count
+                      FROM pin_likes
+                      GROUP BY visual_item_id
+                  )
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                          u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                          COALESCE(ls.like_count, 0) AS like_count
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
+                  LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
                 WHERE v.uploaded_by = ?
                 ORDER BY v.id DESC
                 """;
@@ -235,11 +251,18 @@ public class UserPanelRepository {
 
     public List<VisualItemResponse> findAllCreations() {
         String sql = """
+                  WITH like_stats AS (
+                      SELECT visual_item_id, COUNT(*) AS like_count
+                      FROM pin_likes
+                      GROUP BY visual_item_id
+                  )
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                          u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                          COALESCE(ls.like_count, 0) AS like_count
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
+                  LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
                 ORDER BY v.id DESC
                 """;
         return jdbcTemplate.query(sql, visualItemRowMapper);

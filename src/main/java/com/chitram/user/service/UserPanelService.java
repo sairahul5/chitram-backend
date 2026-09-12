@@ -2,6 +2,8 @@ package com.chitram.user.service;
 
 import com.chitram.admin.dto.VisualItemResponse;
 import com.chitram.admin.repository.AdminPanelRepository;
+import com.chitram.recommendation.model.InteractionType;
+import com.chitram.recommendation.service.RecommendationService;
 import com.chitram.user.dto.UserProfileDetailsResponse;
 import com.chitram.user.dto.UserPanelResponse;
 import com.chitram.user.dto.UserSummaryResponse;
@@ -18,14 +20,17 @@ public class UserPanelService {
     private final UserPanelRepository userPanelRepository;
     private final UserAccountRepository userAccountRepository;
     private final AdminPanelRepository adminPanelRepository;
+    private final RecommendationService recommendationService;
 
     public UserPanelService(
             UserPanelRepository userPanelRepository,
             UserAccountRepository userAccountRepository,
-            AdminPanelRepository adminPanelRepository) {
+            AdminPanelRepository adminPanelRepository,
+            RecommendationService recommendationService) {
         this.userPanelRepository = userPanelRepository;
         this.userAccountRepository = userAccountRepository;
         this.adminPanelRepository = adminPanelRepository;
+        this.recommendationService = recommendationService;
     }
 
     public UserPanelResponse getPanel() {
@@ -77,6 +82,7 @@ public class UserPanelService {
 
     public void savePin(Long userId, Long visualItemId) {
         userPanelRepository.savePin(userId, visualItemId);
+        recommendationService.recordInteraction(userId, visualItemId, InteractionType.SAVE, null);
     }
 
     public void unsavePin(Long userId, Long visualItemId) {

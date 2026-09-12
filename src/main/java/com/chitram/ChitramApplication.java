@@ -26,6 +26,40 @@ public class ChitramApplication {
                             PRIMARY KEY (user_id, visual_item_id)
                         )
                         """);
+                    jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS pin_likes (
+                            id BIGSERIAL PRIMARY KEY,
+                            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            CONSTRAINT uq_pin_likes_user_pin UNIQUE (user_id, visual_item_id)
+                        )
+                        """);
+                    jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_user ON pin_likes (user_id)");
+                    jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_pin_likes_pin ON pin_likes (visual_item_id)");
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS user_interactions (
+                            id BIGSERIAL PRIMARY KEY,
+                            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
+                            interaction_type VARCHAR(30) NOT NULL,
+                            duration_ms BIGINT,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """);
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS user_interests (
+                            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            category VARCHAR(120) NOT NULL,
+                            score DOUBLE PRECISION NOT NULL DEFAULT 0,
+                            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (user_id, category)
+                        )
+                        """);
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_user_interactions_user_pin ON user_interactions (user_id, visual_item_id)");
+                jdbcTemplate.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_user_interactions_pin ON user_interactions (visual_item_id)");
                 jdbcTemplate.queryForObject("SELECT 1", Integer.class);
                 System.out.println("Chitram database connection successful");
             } catch (DataAccessException exception) {

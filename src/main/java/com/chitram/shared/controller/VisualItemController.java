@@ -51,10 +51,17 @@ public class VisualItemController {
     public VisualFeedResponse getFeed(
             @RequestParam(required = false) Long cursor,
             @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) String query) {
+            @RequestParam(required = false) String query,
+            @AuthenticationPrincipal OAuth2User user) {
 
         int safeLimit = Math.max(1, Math.min(limit, 50));
-        List<VisualItemResponse> rawItems = adminPanelRepository.findFeed(query, cursor, safeLimit);
+        Long currentUserId = null;
+        if (user != null && user.getAttribute("email") != null) {
+            currentUserId = userAccountRepository.findByEmail(user.getAttribute("email"))
+                    .map(account -> account.getId())
+                    .orElse(null);
+        }
+        List<VisualItemResponse> rawItems = adminPanelRepository.findFeed(query, cursor, safeLimit, currentUserId);
 
         boolean hasMore = rawItems.size() > safeLimit;
         List<VisualItemResponse> items = hasMore ? new ArrayList<>(rawItems.subList(0, safeLimit)) : rawItems;

@@ -1,0 +1,55 @@
+package com.chitram.recommendation.controller;
+
+import com.chitram.admin.dto.VisualItemResponse;
+import com.chitram.recommendation.model.InteractionType;
+import com.chitram.recommendation.service.RecommendationService;
+import com.chitram.user.entity.UserAccount;
+import com.chitram.user.service.UserProfileService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/recommendations")
+public class RecommendationController {
+
+    private final RecommendationService recommendationService;
+    private final UserProfileService userProfileService;
+
+    public RecommendationController(
+            RecommendationService recommendationService,
+            UserProfileService userProfileService) {
+        this.recommendationService = recommendationService;
+        this.userProfileService = userProfileService;
+    }
+
+    @GetMapping
+    public List<VisualItemResponse> getRecommendations(
+            @AuthenticationPrincipal OAuth2User principal,
+            @RequestParam(defaultValue = "20") int limit) {
+        UserAccount account = userProfileService.getCurrentUser(principal);
+        return recommendationService.getRecommendations(account.getId(), limit);
+    }
+
+    @PostMapping("/interactions")
+    public void recordInteraction(
+            @AuthenticationPrincipal OAuth2User principal,
+            @RequestBody InteractionRequest request) {
+        UserAccount account = userProfileService.getCurrentUser(principal);
+        recommendationService.recordInteraction(
+                account.getId(),
+                request.pinId(),
+                InteractionType.valueOf(request.type().trim().toUpperCase()),
+                request.durationMs());
+    }
+
+    public record InteractionRequest(Long pinId, String type, Long durationMs) {
+    }
+}

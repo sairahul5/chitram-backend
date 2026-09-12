@@ -105,6 +105,31 @@ public class AdminPanelRepository {
                 resultSet.getString("creator_picture_url"));
     };
 
+    private final org.springframework.jdbc.core.RowMapper<VisualItemResponse> visualItemLikeRowMapper = (resultSet,
+            rowNumber) -> {
+        java.sql.Timestamp createdAtTimestamp = resultSet.getTimestamp("created_at");
+        java.time.Instant createdAt = createdAtTimestamp != null ? createdAtTimestamp.toInstant() : null;
+        return new VisualItemResponse(
+                resultSet.getLong("id"),
+                resultSet.getString("title"),
+                resultSet.getString("category"),
+                resultSet.getString("image_url"),
+                resultSet.getString("image_path"),
+                resultSet.getObject("width", Integer.class),
+                resultSet.getObject("height", Integer.class),
+                resultSet.getBigDecimal("aspect_ratio"),
+                resultSet.getObject("file_size", Long.class),
+                resultSet.getString("mime_type"),
+                resultSet.getString("description"),
+                createdAt,
+                resultSet.getObject("uploaded_by", Long.class),
+                resultSet.getString("creator_name"),
+                resultSet.getString("creator_username"),
+                resultSet.getString("creator_picture_url"),
+                resultSet.getLong("like_count"),
+                resultSet.getBoolean("liked_by_current_user"));
+    };
+
     public List<VisualItemResponse> findVisualItems(String query) {
         String search = query == null ? "" : query.trim();
         String sql = """
@@ -119,23 +144,36 @@ public class AdminPanelRepository {
         return jdbcTemplate.query(sql, visualItemRowMapper, "%" + search + "%", "%" + search + "%");
     }
 
-    public List<VisualItemResponse> findFeed(String query, Long cursor, int limit) {
+    public List<VisualItemResponse> findFeed(String query, Long cursor, int limit, Long currentUserId) {
         int safeLimit = Math.max(1, Math.min(limit, 50));
         String search = query == null ? "" : query.trim();
         boolean hasSearch = !search.isEmpty();
         boolean hasCursor = cursor != null && cursor > 0;
 
         StringBuilder sql = new StringBuilder(
-                """
+            """
+                WITH like_stats AS (
+                    SELECT visual_item_id, COUNT(*) AS like_count
+                    FROM pin_likes
+                    GROUP BY visual_item_id
+                )
                         SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                                v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
-                               u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
+                       COALESCE(ls.like_count, 0) AS like_count,
+                       EXISTS (
+                       SELECT 1 FROM pin_likes current_like
+                       WHERE current_like.visual_item_id = v.id
+                         AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1)
+                       ) AS liked_by_current_user
                         FROM visual_items v
                         LEFT JOIN users u ON u.id = v.uploaded_by
+                LEFT JOIN like_stats ls ON ls.visual_item_id = v.id
                         WHERE 1=1
                         """);
 
         java.util.List<Object> params = new java.util.ArrayList<>();
+        params.add(currentUserId);
 
         if (hasSearch) {
             sql.append(" AND (LOWER(v.title) LIKE LOWER(?) OR LOWER(v.category) LIKE LOWER(?))");
@@ -151,7 +189,7 @@ public class AdminPanelRepository {
         sql.append(" ORDER BY v.id DESC LIMIT ?");
         params.add(safeLimit + 1); // Fetch 1 extra to determine hasMore
 
-        return jdbcTemplate.query(sql.toString(), visualItemRowMapper, params.toArray());
+        return jdbcTemplate.query(sql.toString(), visualItemLikeRowMapper, params.toArray());
     }
 
     public java.util.Optional<VisualItemResponse> findById(long id) {
