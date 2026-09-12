@@ -47,6 +47,10 @@ public class ChitramApplication {
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         )
                         """);
+                    jdbcTemplate.execute(
+                        "ALTER TABLE user_interactions ADD COLUMN IF NOT EXISTS duration_ms BIGINT");
+                    jdbcTemplate.execute(
+                        "ALTER TABLE user_interactions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS user_interests (
                             user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -56,6 +60,12 @@ public class ChitramApplication {
                             PRIMARY KEY (user_id, category)
                         )
                         """);
+                    jdbcTemplate.execute(
+                        "ALTER TABLE user_interests ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION NOT NULL DEFAULT 0");
+                    jdbcTemplate.execute(
+                        "ALTER TABLE user_interests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP");
+                    jdbcTemplate.execute(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_interests_user_category ON user_interests (user_id, category)");
                 jdbcTemplate.execute(
                         "CREATE INDEX IF NOT EXISTS idx_user_interactions_user_pin ON user_interactions (user_id, visual_item_id)");
                 jdbcTemplate.execute(
