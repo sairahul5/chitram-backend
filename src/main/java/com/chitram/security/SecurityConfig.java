@@ -27,9 +27,12 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/health", "/error", "/oauth2/**", "/login/**", "/api/auth/logout", "/api/auth/session").permitAll()
+                        .requestMatchers("/health", "/error", "/oauth2/**", "/login/**", "/api/auth/logout",
+                                "/api/auth/session")
+                        .permitAll()
                         .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/visual-items/**", "/api/recommendations/status").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/visual-items/**", "/api/recommendations/status")
+                        .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/user/search", "/api/user/profile/*").permitAll()
                         .requestMatchers("/api/admin/**", "/api/user/**").authenticated()
                         .anyRequest().authenticated())
@@ -69,10 +72,10 @@ public class SecurityConfig {
             @Value("${FRONTEND_URL:http://localhost:3000}") String frontendUrl) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(frontendUrl.split(","))
-            .stream()
-            .map(String::trim)
-            .filter(origin -> !origin.isEmpty())
-            .toList());
+                .stream()
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("*"));

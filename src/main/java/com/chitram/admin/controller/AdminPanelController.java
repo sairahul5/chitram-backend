@@ -7,6 +7,8 @@ import com.chitram.admin.dto.RoleUpdateRequest;
 import com.chitram.admin.dto.VisualItemResponse;
 import com.chitram.admin.dto.AdminCategoryResponse;
 import com.chitram.admin.dto.AdminReportResponse;
+import com.chitram.admin.dto.AdminActivityResponse;
+import com.chitram.admin.dto.DatabaseOverviewResponse;
 import com.chitram.admin.service.AdminPanelService;
 import com.chitram.admin.service.AdminAuthorizationService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -48,7 +50,8 @@ public class AdminPanelController {
     }
 
     @GetMapping("/users")
-    public List<AdminUserResponse> getUsers(@AuthenticationPrincipal OAuth2User user, @RequestParam(required = false) String search) {
+    public List<AdminUserResponse> getUsers(@AuthenticationPrincipal OAuth2User user,
+            @RequestParam(required = false) String search) {
         requireAdmin(user);
         return adminPanelService.searchUsers(search);
     }
@@ -63,7 +66,8 @@ public class AdminPanelController {
     }
 
     @PutMapping("/users/{userId}/status")
-    public void updateUserStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long userId, @RequestBody UserStatusRequest request) {
+    public void updateUserStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long userId,
+            @RequestBody UserStatusRequest request) {
         requireAdmin(user);
         adminPanelService.setAccountStatus(userId, request.status());
     }
@@ -75,33 +79,57 @@ public class AdminPanelController {
     }
 
     @GetMapping("/categories")
-    public List<AdminCategoryResponse> getCategories(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getCategories(); }
+    public List<AdminCategoryResponse> getCategories(@AuthenticationPrincipal OAuth2User user) {
+        requireAdmin(user);
+        return adminPanelService.getCategories();
+    }
 
     @PostMapping("/categories")
-    public AdminCategoryResponse createCategory(@AuthenticationPrincipal OAuth2User user, @RequestBody CategoryRequest request) {
-        requireAdmin(user); adminPanelService.createCategory(request.name(), request.description());
-        return adminPanelService.getCategories().stream().filter(category -> category.name().equalsIgnoreCase(request.name().trim())).findFirst().orElseThrow();
+    public AdminCategoryResponse createCategory(@AuthenticationPrincipal OAuth2User user,
+            @RequestBody CategoryRequest request) {
+        requireAdmin(user);
+        adminPanelService.createCategory(request.name(), request.description());
+        return adminPanelService.getCategories().stream()
+                .filter(category -> category.name().equalsIgnoreCase(request.name().trim())).findFirst().orElseThrow();
     }
 
     @PutMapping("/categories/{categoryId}/status")
-    public void updateCategoryStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long categoryId, @RequestBody EnabledRequest request) {
-        requireAdmin(user); adminPanelService.setCategoryEnabled(categoryId, request.enabled());
+    public void updateCategoryStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long categoryId,
+            @RequestBody EnabledRequest request) {
+        requireAdmin(user);
+        adminPanelService.setCategoryEnabled(categoryId, request.enabled());
     }
 
     @org.springframework.web.bind.annotation.DeleteMapping("/categories/{categoryId}")
-    public void deleteCategory(@AuthenticationPrincipal OAuth2User user, @PathVariable long categoryId) { requireAdmin(user); adminPanelService.deleteCategory(categoryId); }
+    public void deleteCategory(@AuthenticationPrincipal OAuth2User user, @PathVariable long categoryId) {
+        requireAdmin(user);
+        adminPanelService.deleteCategory(categoryId);
+    }
 
     @GetMapping("/reports")
-    public List<AdminReportResponse> getReports(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getReports(); }
+    public List<AdminReportResponse> getReports(
+            @AuthenticationPrincipal OAuth2User user,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String targetType) {
+        requireAdmin(user);
+        if ((status != null && !status.isEmpty()) || (targetType != null && !targetType.isEmpty())) {
+            return adminPanelService.getReportsFiltered(status, targetType);
+        }
+        return adminPanelService.getReports();
+    }
 
     @PutMapping("/reports/{reportId}/status")
-    public void updateReportStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long reportId, @RequestBody StatusRequest request) {
-        requireAdmin(user); adminPanelService.setReportStatus(reportId, request.status());
+    public void updateReportStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long reportId,
+            @RequestBody StatusRequest request) {
+        requireAdmin(user);
+        adminPanelService.setReportStatus(reportId, request.status());
     }
 
     @PutMapping("/visual-items/{pinId}/moderation")
-    public void updateModerationStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long pinId, @RequestBody StatusRequest request) {
-        requireAdmin(user); adminPanelService.setModerationStatus(pinId, request.status());
+    public void updateModerationStatus(@AuthenticationPrincipal OAuth2User user, @PathVariable long pinId,
+            @RequestBody StatusRequest request) {
+        requireAdmin(user);
+        adminPanelService.setModerationStatus(pinId, request.status());
     }
 
     @GetMapping("/visual-items")
@@ -128,15 +156,45 @@ public class AdminPanelController {
     }
 
     @GetMapping("/settings/platform")
-    public java.util.Map<String, Boolean> getPlatformSettings(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getPlatformSettings(); }
+    public java.util.Map<String, Boolean> getPlatformSettings(@AuthenticationPrincipal OAuth2User user) {
+        requireAdmin(user);
+        return adminPanelService.getPlatformSettings();
+    }
 
     @PutMapping("/settings/platform/{key}")
-    public void updatePlatformSetting(@AuthenticationPrincipal OAuth2User user, @PathVariable String key, @RequestBody EnabledRequest request) {
-        requireAdmin(user); adminPanelService.setPlatformSetting(key, request.enabled());
+    public void updatePlatformSetting(@AuthenticationPrincipal OAuth2User user, @PathVariable String key,
+            @RequestBody EnabledRequest request) {
+        requireAdmin(user);
+        adminPanelService.setPlatformSetting(key, request.enabled());
     }
 
     @GetMapping("/activity")
-    public List<com.chitram.admin.dto.AdminActivityResponse> getAdminActivity(@AuthenticationPrincipal OAuth2User user) { requireAdmin(user); return adminPanelService.getAdminActivity(); }
+    public List<AdminActivityResponse> getAdminActivity(
+            @AuthenticationPrincipal OAuth2User user) {
+        requireAdmin(user);
+        return adminPanelService.getAdminActivity();
+    }
+
+    @GetMapping("/database/overview")
+    public DatabaseOverviewResponse getDatabaseOverview(
+            @AuthenticationPrincipal OAuth2User user) {
+        requireAdmin(user);
+        return adminPanelService.getDatabaseOverview();
+    }
+
+    @GetMapping("/settings/session")
+    public SessionDuration getSessionDuration(@AuthenticationPrincipal OAuth2User user) {
+        requireAdmin(user);
+        return new SessionDuration(adminPanelService.getSessionDurationDays());
+    }
+
+    @PutMapping("/settings/session")
+    public SessionDuration updateSessionDuration(@AuthenticationPrincipal OAuth2User user,
+            @RequestBody SessionDuration request) {
+        requireAdmin(user);
+        adminPanelService.setSessionDurationDays(request.sessionDurationDays());
+        return new SessionDuration(adminPanelService.getSessionDurationDays());
+    }
 
     private void requireAdmin(OAuth2User user) {
         adminAuthorizationService.requireAdmin(user.getAttribute("email"));
@@ -147,7 +205,15 @@ public class AdminPanelController {
 
     public record UserStatusRequest(String status) {
     }
-    public record CategoryRequest(String name, String description) { }
-    public record EnabledRequest(boolean enabled) { }
-    public record StatusRequest(String status) { }
+
+    public record CategoryRequest(String name, String description) {
+    }
+
+    public record EnabledRequest(boolean enabled) {
+    }
+
+    public record StatusRequest(String status) {
+    }
+
+    public record SessionDuration(int sessionDurationDays) { }
 }

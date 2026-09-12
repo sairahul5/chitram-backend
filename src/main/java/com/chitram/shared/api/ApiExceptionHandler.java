@@ -13,13 +13,15 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiError> handleStatus(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode())
-                .body(new ApiError(exception.getStatusCode().value(), messageOrDefault(exception.getReason(), "Request failed")));
+                .body(new ApiError(exception.getStatusCode().value(),
+                        messageOrDefault(exception.getReason(), "Request failed")));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleInvalidRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest()
-                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), messageOrDefault(exception.getMessage(), "Invalid request")));
+                .body(new ApiError(HttpStatus.BAD_REQUEST.value(),
+                        messageOrDefault(exception.getMessage(), "Invalid request")));
     }
 
     @ExceptionHandler(DataAccessException.class)

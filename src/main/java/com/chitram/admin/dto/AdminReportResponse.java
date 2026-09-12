@@ -1,4 +1,5 @@
 package com.chitram.admin.dto;
 
-public record AdminReportResponse(long id, long pinId, String reportedBy, String reason, String status, String createdAt) {
+public record AdminReportResponse(long id, String targetType, long targetId, String reportedBy, String reason,
+        String description, String status, String createdAt) {
 }

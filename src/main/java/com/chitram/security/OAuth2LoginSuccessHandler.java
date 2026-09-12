@@ -1,6 +1,7 @@
 package com.chitram.security;
 
 import com.chitram.admin.service.AdminPanelService;
+import com.chitram.admin.repository.AdminPanelRepository;
 import com.chitram.user.service.UserAccountService;
 import com.chitram.websocket.AdminEventPublisher;
 import jakarta.servlet.ServletException;
@@ -21,16 +22,19 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private final UserAccountService userAccountService;
     private final AdminPanelService adminPanelService;
     private final AdminEventPublisher adminEventPublisher;
+    private final AdminPanelRepository adminPanelRepository;
     private final String frontendUrl;
 
     public OAuth2LoginSuccessHandler(
             UserAccountService userAccountService,
             AdminPanelService adminPanelService,
             AdminEventPublisher adminEventPublisher,
+            AdminPanelRepository adminPanelRepository,
             @Value("${FRONTEND_URL:http://localhost:3000}") String frontendUrl) {
         this.userAccountService = userAccountService;
         this.adminPanelService = adminPanelService;
         this.adminEventPublisher = adminEventPublisher;
+        this.adminPanelRepository = adminPanelRepository;
         this.frontendUrl = frontendUrl;
     }
 
@@ -41,6 +45,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             Authentication authentication) throws IOException, ServletException {
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         userAccountService.upsertGoogleUser(oAuth2User);
+        request.getSession().setMaxInactiveInterval(adminPanelRepository.getSessionDurationDays() * 24 * 60 * 60);
         String email = oAuth2User.getAttribute("email");
         // Push live updates to admin panel
         try {

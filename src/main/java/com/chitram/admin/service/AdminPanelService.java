@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import com.chitram.admin.dto.AdminCategoryResponse;
 import com.chitram.admin.dto.AdminReportResponse;
+import com.chitram.admin.dto.AdminActivityResponse;
+import com.chitram.admin.dto.DatabaseOverviewResponse;
+import com.chitram.admin.dto.DatabaseTableInfo;
 
 @Service
 public class AdminPanelService {
@@ -88,8 +91,12 @@ public class AdminPanelService {
         return adminPanelRepository.findReports();
     }
 
+    public List<AdminReportResponse> getReportsFiltered(String status, String targetType) {
+        return adminPanelRepository.findReportsFiltered(status, targetType);
+    }
+
     public void setReportStatus(long id, String status) {
-        if (!List.of("PENDING", "RESOLVED").contains(status))
+        if (!List.of("PENDING", "REVIEWING", "RESOLVED", "DISMISSED").contains(status))
             throw new IllegalArgumentException("Invalid report status");
         adminPanelRepository.setReportStatus(id, status);
     }
@@ -141,8 +148,30 @@ public class AdminPanelService {
         adminPanelRepository.logAdminActivity(enabled ? "ENABLE_SETTING" : "DISABLE_SETTING", key);
     }
 
-    public List<com.chitram.admin.dto.AdminActivityResponse> getAdminActivity() {
+    public List<AdminActivityResponse> getAdminActivity() {
         return adminPanelRepository.findAdminActivity();
+    }
+
+    public int getSessionDurationDays() { return adminPanelRepository.getSessionDurationDays(); }
+
+    public void setSessionDurationDays(int days) {
+        if (!java.util.Set.of(7, 30, 90, 365).contains(days)) {
+            throw new IllegalArgumentException("Session duration must be 7, 30, 90, or 365 days");
+        }
+        adminPanelRepository.setSessionDurationDays(days);
+        adminPanelRepository.logAdminActivity("CHANGE_SESSION_DURATION", days + " days");
+    }
+
+    public DatabaseOverviewResponse getDatabaseOverview() {
+        boolean healthy = adminPanelRepository.checkDatabaseHealth();
+        String status = healthy ? "CONNECTED" : "ERROR";
+        List<DatabaseTableInfo> tables = adminPanelRepository.getDatabaseTableInfo();
+        long totalRows = adminPanelRepository.getTotalRowCount();
+        return new DatabaseOverviewResponse(
+                status,
+                tables.size(),
+                totalRows,
+                tables);
     }
 
     private AdminTableResponse table(String tableName) {

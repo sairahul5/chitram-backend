@@ -10,6 +10,7 @@ import com.chitram.admin.dto.AdminActivityResponse;
 import com.chitram.admin.dto.AdminCategoryResponse;
 import com.chitram.admin.dto.AdminReportResponse;
 import com.chitram.admin.dto.AdminTableResponse;
+import com.chitram.admin.dto.DatabaseTableInfo;
 
 @Repository
 public class AdminPanelRepository {
@@ -59,6 +60,15 @@ public class AdminPanelRepository {
                 Boolean.class,
                 key);
         return enabled == null || enabled;
+    }
+
+    public int getSessionDurationDays() {
+        String value = jdbcTemplate.queryForObject("SELECT setting_value FROM app_settings WHERE setting_key = ?", String.class, "session_duration_days");
+        try { return value == null ? 30 : Integer.parseInt(value); } catch (NumberFormatException exception) { return 30; }
+    }
+
+    public void setSessionDurationDays(int days) {
+        jdbcTemplate.update("UPDATE app_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?", Integer.toString(days), "session_duration_days");
     }
 
     public void logAdminActivity(String action, String target) {
@@ -121,6 +131,12 @@ public class AdminPanelRepository {
                     SELECT 'New pin uploaded', title, created_at FROM visual_items
                     UNION ALL
                     SELECT 'Pin liked', CAST(visual_item_id AS TEXT), created_at FROM pin_likes
+                    UNION ALL
+                    SELECT 'Pin reported', COALESCE(target_type, 'PIN') || ' #' || COALESCE(target_id, visual_item_id), created_at FROM reports
+                    UNION ALL
+                    SELECT 'Pin saved', CAST(visual_item_id AS TEXT), created_at FROM saved_pins
+                    UNION ALL
+                    SELECT action, COALESCE(target, 'Platform'), created_at FROM admin_activity_log
                 ) activity
                 ORDER BY occurred_at DESC
                 LIMIT 8
@@ -153,6 +169,32 @@ public class AdminPanelRepository {
                     String tableName = resultSet.getString("table_name");
                     return new AdminTableResponse(tableName, countRowsExact(tableName), "Healthy");
                 });
+    }
+
+    public boolean checkDatabaseHealth() {
+        try {
+            jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public List<DatabaseTableInfo> getDatabaseTableInfo() {
+        return jdbcTemplate.query(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
+                (resultSet, rowNumber) -> {
+                    String tableName = resultSet.getString("table_name");
+                    long rowCount = countRowsExact(tableName);
+                    return new DatabaseTableInfo(tableName, rowCount, "HEALTHY");
+                });
+    }
+
+    public long getTotalRowCount() {
+        Long total = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(n_live_tup), 0) FROM pg_stat_user_tables WHERE schemaname = 'public'",
+                Long.class);
+        return total == null ? 0 : total;
     }
 
     private long countRowsExact(String tableName) {
@@ -227,13 +269,39 @@ public class AdminPanelRepository {
 
     public List<AdminReportResponse> findReports() {
         return jdbcTemplate.query("""
-                SELECT r.id, r.visual_item_id, COALESCE(u.username, u.email, 'Unknown') AS reported_by,
-                       r.reason, r.status, r.created_at::text
+                  SELECT r.id, COALESCE(r.target_type, 'PIN') AS target_type,
+                      COALESCE(r.target_id, r.visual_item_id) AS target_id,
+                      COALESCE(u.username, u.email, 'Unknown') AS reported_by,
+                      r.reason, r.description, r.status, r.created_at::text
                 FROM reports r LEFT JOIN users u ON u.id = r.reported_by
                 ORDER BY r.created_at DESC LIMIT 100
-                """, (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getLong("visual_item_id"),
-                rs.getString("reported_by"), rs.getString("reason"), rs.getString("status"),
-                rs.getString("created_at")));
+                """, (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getString("target_type"),
+                rs.getLong("target_id"), rs.getString("reported_by"), rs.getString("reason"),
+                rs.getString("description"), rs.getString("status"), rs.getString("created_at")));
+    }
+
+    public List<AdminReportResponse> findReportsFiltered(String status, String targetType) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT r.id, COALESCE(r.target_type, 'PIN') AS target_type,
+                    COALESCE(r.target_id, r.visual_item_id) AS target_id,
+                    COALESCE(u.username, u.email, 'Unknown') AS reported_by,
+                    r.reason, r.description, r.status, r.created_at::text
+                FROM reports r LEFT JOIN users u ON u.id = r.reported_by
+                WHERE 1=1
+                """);
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        if (status != null && !status.isEmpty()) {
+            sql.append(" AND r.status = ?");
+            params.add(status.toUpperCase());
+        }
+        if (targetType != null && !targetType.isEmpty()) {
+            sql.append(" AND COALESCE(r.target_type, 'PIN') = ?");
+            params.add(targetType.toUpperCase());
+        }
+        sql.append(" ORDER BY r.created_at DESC LIMIT 100");
+        return jdbcTemplate.query(sql.toString(), (rs, row) -> new AdminReportResponse(rs.getLong("id"), rs.getString("target_type"),
+                rs.getLong("target_id"), rs.getString("reported_by"), rs.getString("reason"),
+                rs.getString("description"), rs.getString("status"), rs.getString("created_at")), params.toArray());
     }
 
     public void setReportStatus(long reportId, String status) {

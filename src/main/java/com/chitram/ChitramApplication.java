@@ -47,9 +47,9 @@ public class ChitramApplication {
                             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         )
                         """);
-                    jdbcTemplate.execute(
+                jdbcTemplate.execute(
                         "ALTER TABLE user_interactions ADD COLUMN IF NOT EXISTS duration_ms BIGINT");
-                    jdbcTemplate.execute(
+                jdbcTemplate.execute(
                         "ALTER TABLE user_interactions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS user_interests (
@@ -60,11 +60,11 @@ public class ChitramApplication {
                             PRIMARY KEY (user_id, category)
                         )
                         """);
-                    jdbcTemplate.execute(
+                jdbcTemplate.execute(
                         "ALTER TABLE user_interests ADD COLUMN IF NOT EXISTS score DOUBLE PRECISION NOT NULL DEFAULT 0");
-                    jdbcTemplate.execute(
+                jdbcTemplate.execute(
                         "ALTER TABLE user_interests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP");
-                    jdbcTemplate.execute(
+                jdbcTemplate.execute(
                         "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_interests_user_category ON user_interests (user_id, category)");
                 jdbcTemplate.execute(
                         "CREATE INDEX IF NOT EXISTS idx_user_interactions_user_pin ON user_interactions (user_id, visual_item_id)");
@@ -74,48 +74,62 @@ public class ChitramApplication {
                         CREATE TABLE IF NOT EXISTS app_settings (
                             setting_key VARCHAR(120) PRIMARY KEY,
                             enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                                                        setting_value VARCHAR(120),
                             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                         )
                         """);
+                                jdbcTemplate.execute("ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS setting_value VARCHAR(120)");
                 jdbcTemplate.update(
                         "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
                         "recommendations_enabled");
-                for (String setting : new String[] { "registration_enabled", "image_uploads_enabled", "public_profiles_enabled" }) {
+                jdbcTemplate.update(
+                        "INSERT INTO app_settings (setting_key, enabled, setting_value) VALUES (?, TRUE, ?) ON CONFLICT (setting_key) DO UPDATE SET setting_value = COALESCE(app_settings.setting_value, EXCLUDED.setting_value)",
+                        "session_duration_days", "30");
+                for (String setting : new String[] { "registration_enabled", "image_uploads_enabled",
+                        "public_profiles_enabled" }) {
                     jdbcTemplate.update(
-                        "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
-                        setting);
+                            "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
+                            setting);
                 }
                 jdbcTemplate.execute("""
-                    CREATE TABLE IF NOT EXISTS admin_activity_log (
-                        id BIGSERIAL PRIMARY KEY,
-                        admin_name VARCHAR(160) NOT NULL,
-                        action VARCHAR(120) NOT NULL,
-                        target VARCHAR(240),
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """);
+                        CREATE TABLE IF NOT EXISTS admin_activity_log (
+                            id BIGSERIAL PRIMARY KEY,
+                            admin_name VARCHAR(160) NOT NULL,
+                            action VARCHAR(120) NOT NULL,
+                            target VARCHAR(240),
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """);
                 jdbcTemplate.execute(
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
                 jdbcTemplate.execute(
-                    "ALTER TABLE visual_items ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED'");
+                        "ALTER TABLE visual_items ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED'");
                 jdbcTemplate.execute("""
-                    CREATE TABLE IF NOT EXISTS categories (
-                        id BIGSERIAL PRIMARY KEY,
-                        name VARCHAR(120) NOT NULL UNIQUE,
-                        description VARCHAR(500),
-                        enabled BOOLEAN NOT NULL DEFAULT TRUE
-                    )
-                    """);
+                        CREATE TABLE IF NOT EXISTS categories (
+                            id BIGSERIAL PRIMARY KEY,
+                            name VARCHAR(120) NOT NULL UNIQUE,
+                            description VARCHAR(500),
+                            enabled BOOLEAN NOT NULL DEFAULT TRUE
+                        )
+                        """);
                 jdbcTemplate.execute("""
-                    CREATE TABLE IF NOT EXISTS reports (
-                        id BIGSERIAL PRIMARY KEY,
-                        visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
-                        reported_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-                        reason VARCHAR(120) NOT NULL,
-                        status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """);
+                        CREATE TABLE IF NOT EXISTS reports (
+                            id BIGSERIAL PRIMARY KEY,
+                            visual_item_id BIGINT NOT NULL REFERENCES visual_items(id) ON DELETE CASCADE,
+                            reported_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                            reason VARCHAR(120) NOT NULL,
+                            status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """);
+                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_type VARCHAR(20) NOT NULL DEFAULT 'PIN'");
+                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_id BIGINT");
+                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS reporter_id BIGINT REFERENCES users(id) ON DELETE SET NULL");
+                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS description VARCHAR(1000)");
+                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ");
+                jdbcTemplate.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL");
+                jdbcTemplate.execute("ALTER TABLE reports ALTER COLUMN visual_item_id DROP NOT NULL");
+                jdbcTemplate.execute("UPDATE reports SET target_id = visual_item_id, reporter_id = reported_by WHERE target_id IS NULL");
                 jdbcTemplate.queryForObject("SELECT 1", Integer.class);
                 System.out.println("Chitram database connection successful");
             } catch (DataAccessException exception) {

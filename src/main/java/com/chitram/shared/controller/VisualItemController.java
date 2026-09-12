@@ -98,7 +98,8 @@ public class VisualItemController {
                         .orElse(null);
             }
         }
-        return ResponseEntity.ok(visualItemService.upload(title, category, description, image, width, height, uploadedBy));
+        return ResponseEntity
+                .ok(visualItemService.upload(title, category, description, image, width, height, uploadedBy));
     }
 
     @DeleteMapping("/{id}")
