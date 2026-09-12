@@ -1,6 +1,7 @@
 package com.chitram.recommendation.service;
 
 import com.chitram.admin.dto.VisualItemResponse;
+import com.chitram.admin.repository.AdminPanelRepository;
 import com.chitram.recommendation.model.InteractionType;
 import com.chitram.recommendation.model.RecommendationCandidate;
 import com.chitram.recommendation.repository.RecommendationRepository;
@@ -13,12 +14,19 @@ import java.util.List;
 public class RecommendationService {
 
     private final RecommendationRepository recommendationRepository;
+    private final AdminPanelRepository adminPanelRepository;
 
-    public RecommendationService(RecommendationRepository recommendationRepository) {
+    public RecommendationService(
+            RecommendationRepository recommendationRepository,
+            AdminPanelRepository adminPanelRepository) {
         this.recommendationRepository = recommendationRepository;
+        this.adminPanelRepository = adminPanelRepository;
     }
 
     public void recordInteraction(long userId, long pinId, InteractionType type, Long durationMs) {
+        if (!adminPanelRepository.areRecommendationsEnabled()) {
+            return;
+        }
         recommendationRepository.recordInteraction(userId, pinId, type, durationMs);
         recommendationRepository.updateInterest(userId, pinId, type.weight());
     }

@@ -64,6 +64,14 @@ public class AdminPanelService {
         return adminPanelRepository.findVisualItems(query);
     }
 
+    public boolean areRecommendationsEnabled() {
+        return adminPanelRepository.areRecommendationsEnabled();
+    }
+
+    public void setRecommendationsEnabled(boolean enabled) {
+        adminPanelRepository.setRecommendationsEnabled(enabled);
+    }
+
     private AdminTableResponse table(String tableName) {
         boolean exists = adminPanelRepository.tableExists(tableName);
         return new AdminTableResponse(

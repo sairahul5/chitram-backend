@@ -3,6 +3,7 @@ package com.chitram.recommendation.controller;
 import com.chitram.admin.dto.VisualItemResponse;
 import com.chitram.recommendation.model.InteractionType;
 import com.chitram.recommendation.service.RecommendationService;
+import com.chitram.admin.repository.AdminPanelRepository;
 import com.chitram.user.entity.UserAccount;
 import com.chitram.user.service.UserProfileService;
 import org.springframework.dao.DataAccessException;
@@ -24,12 +25,20 @@ public class RecommendationController {
 
     private final RecommendationService recommendationService;
     private final UserProfileService userProfileService;
+    private final AdminPanelRepository adminPanelRepository;
 
     public RecommendationController(
             RecommendationService recommendationService,
-            UserProfileService userProfileService) {
+            UserProfileService userProfileService,
+            AdminPanelRepository adminPanelRepository) {
         this.recommendationService = recommendationService;
         this.userProfileService = userProfileService;
+        this.adminPanelRepository = adminPanelRepository;
+    }
+
+    @GetMapping("/status")
+    public RecommendationStatus getStatus() {
+        return new RecommendationStatus(adminPanelRepository.areRecommendationsEnabled());
     }
 
     @GetMapping
@@ -44,6 +53,9 @@ public class RecommendationController {
     public ResponseEntity<Void> recordInteraction(
             @AuthenticationPrincipal OAuth2User principal,
             @RequestBody InteractionRequest request) {
+        if (!adminPanelRepository.areRecommendationsEnabled()) {
+            return ResponseEntity.accepted().build();
+        }
         UserAccount account = userProfileService.getCurrentUser(principal);
         try {
             recommendationService.recordInteraction(
@@ -59,5 +71,8 @@ public class RecommendationController {
     }
 
     public record InteractionRequest(Long pinId, String type, Long durationMs) {
+    }
+
+    public record RecommendationStatus(boolean enabled) {
     }
 }

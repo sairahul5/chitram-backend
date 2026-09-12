@@ -70,6 +70,16 @@ public class ChitramApplication {
                         "CREATE INDEX IF NOT EXISTS idx_user_interactions_user_pin ON user_interactions (user_id, visual_item_id)");
                 jdbcTemplate.execute(
                         "CREATE INDEX IF NOT EXISTS idx_user_interactions_pin ON user_interactions (visual_item_id)");
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS app_settings (
+                            setting_key VARCHAR(120) PRIMARY KEY,
+                            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """);
+                jdbcTemplate.update(
+                        "INSERT INTO app_settings (setting_key, enabled) VALUES (?, TRUE) ON CONFLICT (setting_key) DO NOTHING",
+                        "recommendations_enabled");
                 jdbcTemplate.queryForObject("SELECT 1", Integer.class);
                 System.out.println("Chitram database connection successful");
             } catch (DataAccessException exception) {

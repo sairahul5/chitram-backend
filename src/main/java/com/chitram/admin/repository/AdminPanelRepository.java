@@ -20,6 +20,21 @@ public class AdminPanelRepository {
         return List.of("moderation", "platform-settings", "usage-overview");
     }
 
+    public boolean areRecommendationsEnabled() {
+        Boolean enabled = jdbcTemplate.queryForObject(
+                "SELECT enabled FROM app_settings WHERE setting_key = ?",
+                Boolean.class,
+                "recommendations_enabled");
+        return enabled == null || enabled;
+    }
+
+    public void setRecommendationsEnabled(boolean enabled) {
+        jdbcTemplate.update(
+                "UPDATE app_settings SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?",
+                enabled,
+                "recommendations_enabled");
+    }
+
     public long countUsers() {
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Long.class);
         return count == null ? 0 : count;

@@ -67,7 +67,25 @@ public class AdminPanelController {
         return adminPanelService.getVisualItems(query);
     }
 
+    @GetMapping("/settings/recommendations")
+    public RecommendationSettings getRecommendationSettings(@AuthenticationPrincipal OAuth2User user) {
+        requireAdmin(user);
+        return new RecommendationSettings(adminPanelService.areRecommendationsEnabled());
+    }
+
+    @PutMapping("/settings/recommendations")
+    public RecommendationSettings updateRecommendationSettings(
+            @AuthenticationPrincipal OAuth2User user,
+            @RequestBody RecommendationSettings request) {
+        requireAdmin(user);
+        adminPanelService.setRecommendationsEnabled(request.enabled());
+        return new RecommendationSettings(adminPanelService.areRecommendationsEnabled());
+    }
+
     private void requireAdmin(OAuth2User user) {
         adminAuthorizationService.requireAdmin(user.getAttribute("email"));
+    }
+
+    public record RecommendationSettings(boolean enabled) {
     }
 }
