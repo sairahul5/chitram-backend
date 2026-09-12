@@ -359,7 +359,10 @@ public class AdminPanelRepository {
                 uploadedBy,
                 resultSet.getString("creator_name"),
                 resultSet.getString("creator_username"),
-                resultSet.getString("creator_picture_url"));
+                resultSet.getString("creator_picture_url"),
+                0,
+                false,
+                resultSet.getString("share_key"));
     };
 
     private final org.springframework.jdbc.core.RowMapper<VisualItemResponse> visualItemLikeRowMapper = (resultSet,
@@ -384,14 +387,16 @@ public class AdminPanelRepository {
                 resultSet.getString("creator_username"),
                 resultSet.getString("creator_picture_url"),
                 resultSet.getLong("like_count"),
-                resultSet.getBoolean("liked_by_current_user"));
+                resultSet.getBoolean("liked_by_current_user"),
+                resultSet.getString("share_key"));
     };
 
     public List<VisualItemResponse> findVisualItems(String query) {
         String search = query == null ? "" : query.trim();
         String sql = """
-                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                  SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                      v.share_key,
                        u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
@@ -414,8 +419,9 @@ public class AdminPanelRepository {
                             FROM pin_likes
                             GROUP BY visual_item_id
                         )
-                                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                                    SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                                   v.share_key,
                                u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
                                COALESCE(ls.like_count, 0) AS like_count,
                                EXISTS (
@@ -451,14 +457,28 @@ public class AdminPanelRepository {
 
     public java.util.Optional<VisualItemResponse> findById(long id) {
         String sql = """
-                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                  SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                      v.share_key,
                        u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
                 WHERE v.id = ?
                 """;
         List<VisualItemResponse> items = jdbcTemplate.query(sql, visualItemRowMapper, id);
+        return items.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(items.get(0));
+    }
+
+    public java.util.Optional<VisualItemResponse> findByShareKey(String username, String shareKey) {
+        String sql = """
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by, v.share_key,
+                       u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url
+                FROM visual_items v
+                JOIN users u ON u.id = v.uploaded_by
+                WHERE LOWER(u.username) = LOWER(?) AND v.share_key = ?
+                """;
+        List<VisualItemResponse> items = jdbcTemplate.query(sql, visualItemRowMapper, username, shareKey);
         return items.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(items.get(0));
     }
 
@@ -477,8 +497,8 @@ public class AdminPanelRepository {
         String sql = """
                 INSERT INTO visual_items (
                     title, category, image_url, image_path, width, height, aspect_ratio,
-                    file_size, mime_type, description, uploaded_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    file_size, mime_type, description, uploaded_by, share_key
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """;
         Long insertedId = jdbcTemplate.queryForObject(
@@ -494,7 +514,8 @@ public class AdminPanelRepository {
                 fileSize,
                 mimeType,
                 description,
-                uploadedBy);
+                uploadedBy,
+                java.util.UUID.randomUUID().toString());
         return findById(insertedId != null ? insertedId : 0L).orElse(null);
     }
 

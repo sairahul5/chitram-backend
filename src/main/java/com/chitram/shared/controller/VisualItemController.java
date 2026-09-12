@@ -54,6 +54,15 @@ public class VisualItemController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/share/{username}/{shareKey}")
+    public ResponseEntity<VisualItemResponse> getSharedVisualItem(
+            @PathVariable String username,
+            @PathVariable String shareKey) {
+        return adminPanelRepository.findByShareKey(username, shareKey)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/feed")
     public VisualFeedResponse getFeed(
             @RequestParam(required = false) Long cursor,

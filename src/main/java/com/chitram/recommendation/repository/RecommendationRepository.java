@@ -65,8 +65,9 @@ public class RecommendationRepository {
                     FROM pin_likes
                     GROUP BY visual_item_id
                 ), candidate_data AS (
-                    SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                          SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                            v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by,
+                              v.share_key,
                            u.display_name AS creator_name, u.username AS creator_username, u.picture_url AS creator_picture_url,
                            COALESCE(ls.like_count, 0) AS like_count,
                            EXISTS (
@@ -132,7 +133,8 @@ public class RecommendationRepository {
                         resultSet.getString("creator_username"),
                         resultSet.getString("creator_picture_url"),
                         resultSet.getLong("like_count"),
-                        resultSet.getBoolean("liked_by_current_user")),
+                        resultSet.getBoolean("liked_by_current_user"),
+                        resultSet.getString("share_key")),
                 resultSet.getDouble("interest_score"),
                 resultSet.getDouble("creator_score"),
                 resultSet.getDouble("popularity_score"),

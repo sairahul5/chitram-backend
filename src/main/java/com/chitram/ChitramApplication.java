@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import java.util.UUID;
 
 @SpringBootApplication
 public class ChitramApplication {
@@ -104,6 +105,12 @@ public class ChitramApplication {
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'");
                 jdbcTemplate.execute(
                         "ALTER TABLE visual_items ADD COLUMN IF NOT EXISTS moderation_status VARCHAR(20) NOT NULL DEFAULT 'APPROVED'");
+                jdbcTemplate.execute("ALTER TABLE visual_items ADD COLUMN IF NOT EXISTS share_key VARCHAR(36)");
+                jdbcTemplate.query("SELECT id FROM visual_items WHERE share_key IS NULL", (resultSet) -> {
+                    jdbcTemplate.update("UPDATE visual_items SET share_key = ? WHERE id = ?",
+                            UUID.randomUUID().toString(), resultSet.getLong("id"));
+                });
+                jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_visual_items_share_key ON visual_items (share_key)");
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS categories (
                             id BIGSERIAL PRIMARY KEY,
