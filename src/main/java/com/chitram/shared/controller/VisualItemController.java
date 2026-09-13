@@ -43,8 +43,16 @@ public class VisualItemController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<VisualItemResponse> getVisualItem(@PathVariable Long id) {
-        return visualItemService.findById(id)
+    public ResponseEntity<VisualItemResponse> getVisualItem(
+            @PathVariable Long id,
+            @AuthenticationPrincipal OAuth2User user) {
+        Long currentUserId = null;
+        if (user != null && user.getAttribute("email") != null) {
+            currentUserId = userAccountRepository.findByEmail(user.getAttribute("email"))
+                    .map(account -> account.getId())
+                    .orElse(null);
+        }
+        return visualItemService.findById(id, currentUserId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

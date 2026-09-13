@@ -62,6 +62,10 @@ public class VisualItemRepository {
                     resultSet.getBoolean("liked_by_current_user"),
                     resultSet.getString("share_key"));
 
+    public Optional<VisualItemResponse> findById(long id) {
+        return findById(id, null);
+    }
+
     public List<VisualItemResponse> findVisualItems(String query, int limit) {
         String search = query == null ? "" : query.trim();
         int safeLimit = Math.max(1, Math.min(limit, 100));
@@ -142,16 +146,22 @@ public class VisualItemRepository {
         return items.stream().findFirst();
     }
 
-    public Optional<VisualItemResponse> findById(long id) {
+    public Optional<VisualItemResponse> findById(long id, Long currentUserId) {
         List<VisualItemResponse> items = jdbcTemplate.query("""
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by, v.share_key,
                        u.display_name AS creator_name, u.username AS creator_username,
-                       u.picture_url AS creator_picture_url
+                       u.picture_url AS creator_picture_url,
+                       (SELECT COUNT(*) FROM pin_likes item_likes
+                        WHERE item_likes.visual_item_id = v.id) AS like_count,
+                       EXISTS (SELECT 1 FROM pin_likes current_like
+                               WHERE current_like.visual_item_id = v.id
+                                 AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1))
+                           AS liked_by_current_user
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
                 WHERE v.id = ?
-                """, visualItemRowMapper, id);
+                """, visualItemLikeRowMapper, currentUserId, id);
         return items.stream().findFirst();
     }
 
@@ -180,7 +190,7 @@ public class VisualItemRepository {
                 RETURNING id
                 """, Long.class, title, category, imageUrl, imagePath, width, height,
                 aspectRatio, fileSize, mimeType, description, uploadedBy, java.util.UUID.randomUUID().toString());
-        return findById(insertedId == null ? 0L : insertedId).orElse(null);
+        return findById(insertedId == null ? 0L : insertedId, null).orElse(null);
     }
 
     public void deleteVisualItem(long id) {

@@ -165,8 +165,8 @@ public class VisualItemService {
         return visualItemRepository.findVisualItems(query, 100);
     }
 
-    public Optional<VisualItemResponse> findById(long id) {
-        return visualItemRepository.findById(id);
+    public Optional<VisualItemResponse> findById(long id, Long currentUserId) {
+        return visualItemRepository.findById(id, currentUserId);
     }
 
     public Optional<VisualItemResponse> findByShareKey(String username, String shareKey) {
