@@ -2,6 +2,7 @@ package com.chitram.shared.service;
 
 import com.chitram.admin.dto.VisualItemResponse;
 import com.chitram.admin.repository.AdminPanelRepository;
+import com.chitram.admin.service.AdminPanelService;
 import com.chitram.websocket.AdminEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,11 +17,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
@@ -41,6 +40,7 @@ public class VisualItemService {
             "image/avif");
 
     private final AdminPanelRepository adminPanelRepository;
+    private final AdminPanelService adminPanelService;
     private final AdminEventPublisher adminEventPublisher;
     private final String supabaseUrl;
     private final String supabaseServiceRoleKey;
@@ -49,11 +49,13 @@ public class VisualItemService {
 
     public VisualItemService(
             AdminPanelRepository adminPanelRepository,
+            AdminPanelService adminPanelService,
             AdminEventPublisher adminEventPublisher,
             @Value("${supabase.url:https://vioobzddncnyqbfljqhp.supabase.co}") String supabaseUrl,
             @Value("${supabase.service-role-key:}") String supabaseServiceRoleKey,
             @Value("${supabase.storage.bucket:chitram-images}") String supabaseBucket) {
         this.adminPanelRepository = adminPanelRepository;
+        this.adminPanelService = adminPanelService;
         this.adminEventPublisher = adminEventPublisher;
         this.supabaseUrl = supabaseUrl.replaceAll("/$", "");
         this.supabaseServiceRoleKey = supabaseServiceRoleKey;
@@ -160,6 +162,7 @@ public class VisualItemService {
                 uploadedBy);
         // Broadcast new image to admin WebSocket subscribers
         adminEventPublisher.publishNewImage(saved);
+        adminPanelService.publishCurrentOperations();
         return saved;
     }
 
@@ -180,6 +183,7 @@ public class VisualItemService {
         adminPanelRepository.deleteVisualItem(pinId);
         // Broadcast deletion to admin WebSocket subscribers
         adminEventPublisher.publishDeletedImage(pinId);
+        adminPanelService.publishCurrentOperations();
     }
 
     public VisualItemResponse updatePin(long pinId, String title, String category, String description,
@@ -199,7 +203,10 @@ public class VisualItemService {
                 title.trim(),
                 category == null || category.trim().isEmpty() ? "General" : category.trim(),
                 description == null || description.trim().isEmpty() ? null : description.trim());
-        return adminPanelRepository.findById(pinId).orElseThrow(() -> new IllegalArgumentException("Pin not found"));
+        VisualItemResponse updated = adminPanelRepository.findById(pinId)
+            .orElseThrow(() -> new IllegalArgumentException("Pin not found"));
+        adminPanelService.publishCurrentOperations();
+        return updated;
     }
 
     private String uploadToSupabaseStorage(byte[] fileBytes, String storagePath, String contentType) {

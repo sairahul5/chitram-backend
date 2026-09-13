@@ -134,4 +134,8 @@ public class UserPanelService {
     public void unfollow(Long currentUserId, Long targetUserId) {
         userPanelRepository.unfollow(currentUserId, targetUserId);
     }
+
+    public boolean isFollowing(Long currentUserId, Long targetUserId) {
+        return currentUserId != null && userPanelRepository.isFollowing(currentUserId, targetUserId);
+    }
 }

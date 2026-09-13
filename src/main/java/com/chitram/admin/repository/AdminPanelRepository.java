@@ -266,6 +266,11 @@ public class AdminPanelRepository {
                         rs.getString("description"), rs.getBoolean("enabled")));
     }
 
+    public List<String> findEnabledCategoryNames() {
+        return jdbcTemplate.query("SELECT name FROM categories WHERE enabled = TRUE ORDER BY name",
+                (rs, row) -> rs.getString("name"));
+    }
+
     public void createCategory(String name, String description) {
         jdbcTemplate.update("INSERT INTO categories (name, description) VALUES (?, ?)", name.trim(), description);
     }

@@ -16,6 +16,7 @@ import com.chitram.admin.dto.AdminReportResponse;
 import com.chitram.admin.dto.AdminActivityResponse;
 import com.chitram.admin.dto.DatabaseOverviewResponse;
 import com.chitram.admin.dto.DatabaseTableInfo;
+import com.chitram.admin.dto.AdminOperationsResponse;
 
 @Service
 public class AdminPanelService {
@@ -63,28 +64,37 @@ public class AdminPanelService {
             throw new IllegalArgumentException("Status must be ACTIVE or SUSPENDED");
         }
         adminPanelRepository.setAccountStatus(userId, status);
+        publishAdminState();
     }
 
     public void deleteUser(long userId) {
         adminPanelRepository.deleteUser(userId);
+        publishAdminState();
     }
 
     public List<AdminCategoryResponse> getCategories() {
         return adminPanelRepository.findCategories();
     }
 
+    public List<String> getEnabledCategoryNames() {
+        return adminPanelRepository.findEnabledCategoryNames();
+    }
+
     public void createCategory(String name, String description) {
         if (name == null || name.trim().isEmpty())
             throw new IllegalArgumentException("Category name is required");
         adminPanelRepository.createCategory(name, description);
+        publishAdminState();
     }
 
     public void setCategoryEnabled(long id, boolean enabled) {
         adminPanelRepository.setCategoryEnabled(id, enabled);
+        publishAdminState();
     }
 
     public void deleteCategory(long id) {
         adminPanelRepository.deleteCategory(id);
+        publishAdminState();
     }
 
     public List<AdminReportResponse> getReports() {
@@ -99,6 +109,7 @@ public class AdminPanelService {
         if (!List.of("PENDING", "REVIEWING", "RESOLVED", "DISMISSED").contains(status))
             throw new IllegalArgumentException("Invalid report status");
         adminPanelRepository.setReportStatus(id, status, adminEmail);
+        publishAdminState();
     }
 
     public void setModerationStatus(long pinId, String status) {
@@ -106,6 +117,7 @@ public class AdminPanelService {
             throw new IllegalArgumentException("Invalid moderation status");
         }
         adminPanelRepository.setModerationStatus(pinId, status);
+        publishAdminState();
     }
 
     public void updateUserRole(long userId, String role) {
@@ -116,6 +128,7 @@ public class AdminPanelService {
         // Push live updates to admin panel
         adminEventPublisher.publishUsers(getUsers());
         adminEventPublisher.publishDashboard(getDashboard());
+        adminEventPublisher.publishOperations(getOperations());
     }
 
     public List<VisualItemResponse> getVisualItems(String query) {
@@ -129,6 +142,7 @@ public class AdminPanelService {
     public void setRecommendationsEnabled(boolean enabled) {
         adminPanelRepository.setRecommendationsEnabled(enabled);
         adminPanelRepository.logAdminActivity(enabled ? "ENABLE_RECOMMENDATIONS" : "DISABLE_RECOMMENDATIONS", null);
+        publishAdminState();
     }
 
     public java.util.Map<String, Boolean> getPlatformSettings() {
@@ -146,6 +160,7 @@ public class AdminPanelService {
         }
         adminPanelRepository.setPlatformSetting(key, enabled);
         adminPanelRepository.logAdminActivity(enabled ? "ENABLE_SETTING" : "DISABLE_SETTING", key);
+        publishAdminState();
     }
 
     public List<AdminActivityResponse> getAdminActivity() {
@@ -162,6 +177,26 @@ public class AdminPanelService {
         }
         adminPanelRepository.setSessionDurationDays(days);
         adminPanelRepository.logAdminActivity("CHANGE_SESSION_DURATION", days + " days");
+        publishAdminState();
+    }
+
+    public AdminOperationsResponse getOperations() {
+        return new AdminOperationsResponse(
+                getCategories(),
+                getReports(),
+                getVisualItems(null),
+                getPlatformSettings(),
+                getAdminActivity(),
+                getSessionDurationDays());
+    }
+
+    public void publishCurrentOperations() {
+        adminEventPublisher.publishOperations(getOperations());
+        adminEventPublisher.publishDashboard(getDashboard());
+    }
+
+    private void publishAdminState() {
+        publishCurrentOperations();
     }
 
     public DatabaseOverviewResponse getDatabaseOverview() {

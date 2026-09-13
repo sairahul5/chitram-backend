@@ -135,6 +135,10 @@ public class ChitramApplication {
                             enabled BOOLEAN NOT NULL DEFAULT TRUE
                         )
                         """);
+                for (String category : new String[] { "Photography", "Travel", "Architecture", "Nature",
+                        "Art & Design", "Lifestyle", "Culture" }) {
+                    jdbcTemplate.update("INSERT INTO categories (name) VALUES (?) ON CONFLICT (name) DO NOTHING", category);
+                }
                 jdbcTemplate.execute("""
                         CREATE TABLE IF NOT EXISTS reports (
                             id BIGSERIAL PRIMARY KEY,

@@ -3,6 +3,7 @@ package com.chitram.websocket;
 import com.chitram.admin.dto.AdminDashboardResponse;
 import com.chitram.admin.dto.AdminUserResponse;
 import com.chitram.admin.dto.VisualItemResponse;
+import com.chitram.admin.dto.AdminOperationsResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,6 +27,7 @@ public class AdminEventPublisher {
     public static final String TOPIC_USERS = "/topic/admin/users";
     public static final String TOPIC_IMAGE_NEW = "/topic/admin/images/new";
     public static final String TOPIC_IMAGE_DEL = "/topic/admin/images/deleted";
+    public static final String TOPIC_OPERATIONS = "/topic/admin/operations";
 
     private final SimpMessagingTemplate messagingTemplate;
     private final SimpUserRegistry userRegistry;
@@ -76,6 +78,15 @@ public class AdminEventPublisher {
             log.debug("Published deleted image id={} to {}", imageId, TOPIC_IMAGE_DEL);
         } catch (Exception e) {
             log.warn("Failed to publish deleted image: {}", e.getMessage());
+        }
+    }
+
+    public void publishOperations(AdminOperationsResponse operations) {
+        try {
+            messagingTemplate.convertAndSend(TOPIC_OPERATIONS, operations);
+            log.debug("Published admin operations update to {}", TOPIC_OPERATIONS);
+        } catch (Exception e) {
+            log.warn("Failed to publish admin operations update: {}", e.getMessage());
         }
     }
 }

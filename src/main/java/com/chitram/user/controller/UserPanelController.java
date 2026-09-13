@@ -128,16 +128,24 @@ public class UserPanelController {
     }
 
     @GetMapping("/profile/{usernameOrId}")
-    public PublicProfileResponse getUserProfile(@PathVariable String usernameOrId) {
+    public PublicProfileResponse getUserProfile(@PathVariable String usernameOrId,
+            @AuthenticationPrincipal OAuth2User principal) {
         UserProfileDetailsResponse profile = userPanelService.getProfile(usernameOrId);
+        Long currentUserId = null;
+        if (principal != null) {
+            currentUserId = userProfileService.getCurrentUser(principal).getId();
+        }
         return new PublicProfileResponse(
                 profile.id(),
                 profile.name(),
                 profile.username(),
                 profile.pictureUrl(),
                 profile.followersCount(),
+                profile.followingCount(),
                 profile.creationsCount(),
-                profile.creations());
+                profile.creations(),
+                userPanelService.isFollowing(currentUserId, profile.id()),
+                profile.isAdmin());
     }
 
     @GetMapping("/followers")

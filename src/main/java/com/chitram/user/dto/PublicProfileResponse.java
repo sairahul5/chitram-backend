@@ -9,6 +9,9 @@ public record PublicProfileResponse(
         String username,
         String pictureUrl,
         long followersCount,
+        long followingCount,
         long creationsCount,
-        List<VisualItemResponse> creations) {
+        List<VisualItemResponse> creations,
+        boolean isFollowing,
+        boolean isAdmin) {
 }

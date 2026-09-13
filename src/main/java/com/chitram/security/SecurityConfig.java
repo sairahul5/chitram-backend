@@ -33,6 +33,8 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/visual-items/**", "/api/recommendations/status")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categories")
+                        .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/user/search", "/api/user/profile/*").permitAll()
                         .requestMatchers("/api/admin/**", "/api/user/**").authenticated()
                         .anyRequest().authenticated())
@@ -73,7 +75,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(frontendUrl.split(","))
                 .stream()
-                .map(String::trim)
+                .map(value -> value == null ? "" : value.trim())
                 .filter(origin -> !origin.isEmpty())
                 .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
