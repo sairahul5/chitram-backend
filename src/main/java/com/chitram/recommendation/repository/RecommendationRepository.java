@@ -25,23 +25,17 @@ public class RecommendationRepository {
     }
 
     public void updateInterest(long userId, long pinId, double weight) {
-        List<String> categories = jdbcTemplate.queryForList(
-                "SELECT category FROM visual_items WHERE id = ?",
-                String.class,
-                pinId);
-        if (categories.isEmpty() || categories.get(0) == null || categories.get(0).isBlank()) {
-            return;
-        }
-
         jdbcTemplate.update(
                 """
                         INSERT INTO user_interests (user_id, category, score, updated_at)
-                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                        ON CONFLICT (user_id, category) DO UPDATE SET
-                            score = user_interests.score + EXCLUDED.score,
-                            updated_at = CURRENT_TIMESTAMP
-                        """,
-                userId, categories.get(0), weight);
+                        SELECT ?, category, ?, CURRENT_TIMESTAMP
+                        FROM visual_items
+                        WHERE id = ? AND category IS NOT NULL AND BTRIM(category) <> ''
+                                ON CONFLICT (user_id, category) DO UPDATE SET
+                                    score = user_interests.score + EXCLUDED.score,
+                                    updated_at = CURRENT_TIMESTAMP
+                                """,
+                userId, weight, pinId);
     }
 
     public List<RecommendationCandidate> findCandidates(long userId, int limit) {
@@ -83,8 +77,7 @@ public class RecommendationRepository {
                     ) v
                     LEFT JOIN users u ON u.id = v.uploaded_by
                     LEFT JOIN user_interests ui ON ui.user_id = ? AND LOWER(ui.category) = LOWER(v.category)
-                                        WHERE
-                                            AND NOT EXISTS (
+                                        WHERE NOT EXISTS (
                         SELECT 1 FROM user_interactions seen
                         WHERE seen.user_id = ?
                           AND seen.visual_item_id = v.id

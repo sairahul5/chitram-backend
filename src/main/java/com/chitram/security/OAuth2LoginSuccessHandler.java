@@ -1,7 +1,7 @@
 package com.chitram.security;
 
 import com.chitram.admin.service.AdminPanelService;
-import com.chitram.admin.repository.AdminPanelRepository;
+import com.chitram.shared.service.PlatformSettingsService;
 import com.chitram.user.service.UserAccountService;
 import com.chitram.websocket.AdminEventPublisher;
 import jakarta.servlet.ServletException;
@@ -22,19 +22,19 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private final UserAccountService userAccountService;
     private final AdminPanelService adminPanelService;
     private final AdminEventPublisher adminEventPublisher;
-    private final AdminPanelRepository adminPanelRepository;
+    private final PlatformSettingsService platformSettingsService;
     private final String frontendUrl;
 
     public OAuth2LoginSuccessHandler(
             UserAccountService userAccountService,
             AdminPanelService adminPanelService,
             AdminEventPublisher adminEventPublisher,
-            AdminPanelRepository adminPanelRepository,
+            PlatformSettingsService platformSettingsService,
             @Value("${FRONTEND_URL:http://localhost:3000}") String frontendUrl) {
         this.userAccountService = userAccountService;
         this.adminPanelService = adminPanelService;
         this.adminEventPublisher = adminEventPublisher;
-        this.adminPanelRepository = adminPanelRepository;
+        this.platformSettingsService = platformSettingsService;
         this.frontendUrl = frontendUrl;
     }
 
@@ -45,13 +45,14 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             Authentication authentication) throws IOException, ServletException {
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
         userAccountService.upsertGoogleUser(oAuth2User);
-        request.getSession().setMaxInactiveInterval(adminPanelRepository.getSessionDurationDays() * 24 * 60 * 60);
+        request.getSession().setMaxInactiveInterval(platformSettingsService.getSessionDurationDays() * 24 * 60 * 60);
         String email = oAuth2User.getAttribute("email");
         // Push live updates to admin panel
         try {
             adminEventPublisher.publishUsers(adminPanelService.getUsers());
             adminEventPublisher.publishDashboard(adminPanelService.getDashboard());
-        } catch (Exception ignored) { /* don't break login if WS publish fails */ }
+        } catch (Exception ignored) {
+            /* don't break login if WS publish fails */ }
         String destination = userAccountService.isAdmin(email) ? "/admin" : "/user";
         getRedirectStrategy().sendRedirect(request, response, resolveFrontendBaseUrl(request) + destination);
     }

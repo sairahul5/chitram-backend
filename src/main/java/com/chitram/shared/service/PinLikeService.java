@@ -21,9 +21,9 @@ public class PinLikeService {
 
     @Transactional
     public LikeResult like(long userId, long pinId) {
-        requirePin(pinId);
-        boolean inserted = pinLikeRepository.insertLike(userId, pinId);
-        if (inserted) {
+        PinLikeRepository.LikeMutation mutation = pinLikeRepository.insertLike(userId, pinId);
+        requirePin(mutation);
+        if (mutation.changed()) {
             recommendationService.recordInteraction(userId, pinId, InteractionType.LIKE, null);
         }
         return new LikeResult(true, pinLikeRepository.countLikes(pinId));
@@ -31,13 +31,13 @@ public class PinLikeService {
 
     @Transactional
     public LikeResult unlike(long userId, long pinId) {
-        requirePin(pinId);
-        pinLikeRepository.deleteLike(userId, pinId);
+        PinLikeRepository.LikeMutation mutation = pinLikeRepository.deleteLike(userId, pinId);
+        requirePin(mutation);
         return new LikeResult(false, pinLikeRepository.countLikes(pinId));
     }
 
-    private void requirePin(long pinId) {
-        if (!pinLikeRepository.pinExists(pinId)) {
+    private void requirePin(PinLikeRepository.LikeMutation mutation) {
+        if (!mutation.pinExists()) {
             throw new IllegalArgumentException("Pin not found");
         }
     }

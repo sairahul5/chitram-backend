@@ -2,7 +2,6 @@ package com.chitram.shared.controller;
 
 import com.chitram.admin.dto.VisualFeedResponse;
 import com.chitram.admin.dto.VisualItemResponse;
-import com.chitram.admin.repository.AdminPanelRepository;
 import com.chitram.shared.service.VisualItemService;
 import com.chitram.user.repository.UserAccountRepository;
 import org.springframework.http.HttpStatus;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -29,27 +27,24 @@ import java.util.Map;
 @RequestMapping("/api/visual-items")
 public class VisualItemController {
 
-    private final AdminPanelRepository adminPanelRepository;
     private final VisualItemService visualItemService;
     private final UserAccountRepository userAccountRepository;
 
     public VisualItemController(
-            AdminPanelRepository adminPanelRepository,
             VisualItemService visualItemService,
             UserAccountRepository userAccountRepository) {
-        this.adminPanelRepository = adminPanelRepository;
         this.visualItemService = visualItemService;
         this.userAccountRepository = userAccountRepository;
     }
 
     @GetMapping
     public List<VisualItemResponse> getVisualItems(@RequestParam(required = false) String query) {
-        return adminPanelRepository.findVisualItems(query);
+        return visualItemService.findVisualItems(query);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<VisualItemResponse> getVisualItem(@PathVariable Long id) {
-        return adminPanelRepository.findById(id)
+        return visualItemService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -58,7 +53,7 @@ public class VisualItemController {
     public ResponseEntity<VisualItemResponse> getSharedVisualItem(
             @PathVariable String username,
             @PathVariable String shareKey) {
-        return adminPanelRepository.findByShareKey(username, shareKey)
+        return visualItemService.findByShareKey(username, shareKey)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -70,24 +65,13 @@ public class VisualItemController {
             @RequestParam(required = false) String query,
             @AuthenticationPrincipal OAuth2User user) {
 
-        int safeLimit = Math.max(1, Math.min(limit, 50));
         Long currentUserId = null;
         if (user != null && user.getAttribute("email") != null) {
             currentUserId = userAccountRepository.findByEmail(user.getAttribute("email"))
                     .map(account -> account.getId())
                     .orElse(null);
         }
-        List<VisualItemResponse> rawItems = adminPanelRepository.findFeed(query, cursor, safeLimit, currentUserId);
-
-        boolean hasMore = rawItems.size() > safeLimit;
-        List<VisualItemResponse> items = hasMore ? new ArrayList<>(rawItems.subList(0, safeLimit)) : rawItems;
-
-        Long nextCursor = null;
-        if (hasMore && !items.isEmpty()) {
-            nextCursor = items.get(items.size() - 1).id();
-        }
-
-        return new VisualFeedResponse(items, nextCursor, hasMore);
+        return visualItemService.findFeed(query, cursor, limit, currentUserId);
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -100,7 +84,7 @@ public class VisualItemController {
             @RequestParam(value = "width", required = false) Integer width,
             @RequestParam(value = "height", required = false) Integer height) {
 
-        if (!adminPanelRepository.isPlatformSettingEnabled("image_uploads_enabled")) {
+        if (!visualItemService.areUploadsEnabled()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message", "Image uploads are currently disabled by the administrator"));
         }
@@ -136,7 +120,7 @@ public class VisualItemController {
                 .map(account -> account.getId())
                 .orElse(null);
 
-        boolean isAdmin = adminPanelRepository.isAdmin(email);
+        boolean isAdmin = visualItemService.isAdmin(email);
 
         try {
             visualItemService.deletePin(id, userId, isAdmin);
@@ -170,7 +154,7 @@ public class VisualItemController {
                     request.category(),
                     request.description(),
                     userId,
-                    adminPanelRepository.isAdmin(email));
+                    visualItemService.isAdmin(email));
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));

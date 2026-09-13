@@ -1,12 +1,13 @@
 package com.chitram.shared.service;
 
 import com.chitram.admin.dto.VisualItemResponse;
-import com.chitram.admin.repository.AdminPanelRepository;
+import com.chitram.admin.dto.VisualFeedResponse;
 import com.chitram.admin.service.AdminPanelService;
+import com.chitram.admin.repository.VisualItemRepository;
+import com.chitram.admin.service.AdminAuthorizationService;
 import com.chitram.websocket.AdminEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,12 +17,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,30 +38,26 @@ public class VisualItemService {
             "image/webp",
             "image/avif");
 
-    private final AdminPanelRepository adminPanelRepository;
+    private final VisualItemRepository visualItemRepository;
+    private final AdminAuthorizationService adminAuthorizationService;
     private final AdminPanelService adminPanelService;
     private final AdminEventPublisher adminEventPublisher;
-    private final String supabaseUrl;
-    private final String supabaseServiceRoleKey;
-    private final String supabaseBucket;
-    private final HttpClient httpClient;
+    private final PlatformSettingsService platformSettingsService;
+    private final StorageService storageService;
 
     public VisualItemService(
-            AdminPanelRepository adminPanelRepository,
+            VisualItemRepository visualItemRepository,
+            AdminAuthorizationService adminAuthorizationService,
             AdminPanelService adminPanelService,
             AdminEventPublisher adminEventPublisher,
-            @Value("${supabase.url:https://vioobzddncnyqbfljqhp.supabase.co}") String supabaseUrl,
-            @Value("${supabase.service-role-key:}") String supabaseServiceRoleKey,
-            @Value("${supabase.storage.bucket:chitram-images}") String supabaseBucket) {
-        this.adminPanelRepository = adminPanelRepository;
+            PlatformSettingsService platformSettingsService,
+            StorageService storageService) {
+        this.visualItemRepository = visualItemRepository;
+        this.adminAuthorizationService = adminAuthorizationService;
         this.adminPanelService = adminPanelService;
         this.adminEventPublisher = adminEventPublisher;
-        this.supabaseUrl = supabaseUrl.replaceAll("/$", "");
-        this.supabaseServiceRoleKey = supabaseServiceRoleKey;
-        this.supabaseBucket = supabaseBucket;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.platformSettingsService = platformSettingsService;
+        this.storageService = storageService;
     }
 
     public VisualItemResponse upload(
@@ -145,10 +140,10 @@ public class VisualItemService {
         String storagePath = String.format("pins/%s/%s_%s%s", userFolder, UUID.randomUUID(), baseName, extension);
 
         // 6. Upload to Supabase Storage
-        String imageUrl = uploadToSupabaseStorage(bytes, storagePath, mimeType);
+        String imageUrl = storageService.upload(bytes, storagePath, mimeType);
 
         // 7. Save metadata into PostgreSQL
-        VisualItemResponse saved = adminPanelRepository.insertVisualItem(
+        VisualItemResponse saved = visualItemRepository.insertVisualItem(
                 title.trim(),
                 category != null && !category.trim().isEmpty() ? category.trim() : "General",
                 imageUrl,
@@ -166,8 +161,37 @@ public class VisualItemService {
         return saved;
     }
 
+    public List<VisualItemResponse> findVisualItems(String query) {
+        return visualItemRepository.findVisualItems(query, 100);
+    }
+
+    public Optional<VisualItemResponse> findById(long id) {
+        return visualItemRepository.findById(id);
+    }
+
+    public Optional<VisualItemResponse> findByShareKey(String username, String shareKey) {
+        return visualItemRepository.findByShareKey(username, shareKey);
+    }
+
+    public VisualFeedResponse findFeed(String query, Long cursor, int limit, Long currentUserId) {
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+        List<VisualItemResponse> rawItems = visualItemRepository.findFeed(query, cursor, safeLimit, currentUserId);
+        boolean hasMore = rawItems.size() > safeLimit;
+        List<VisualItemResponse> items = hasMore ? new ArrayList<>(rawItems.subList(0, safeLimit)) : rawItems;
+        Long nextCursor = hasMore && !items.isEmpty() ? items.get(items.size() - 1).id() : null;
+        return new VisualFeedResponse(items, nextCursor, hasMore);
+    }
+
+    public boolean areUploadsEnabled() {
+        return platformSettingsService.isImageUploadsEnabled();
+    }
+
+    public boolean isAdmin(String email) {
+        return adminAuthorizationService.hasAdminRole(email);
+    }
+
     public void deletePin(long pinId, Long currentUserId, boolean isAdmin) {
-        VisualItemResponse item = adminPanelRepository.findById(pinId)
+        VisualItemResponse item = visualItemRepository.findById(pinId)
                 .orElseThrow(() -> new IllegalArgumentException("Pin not found"));
 
         if (!isAdmin && (currentUserId == null || !currentUserId.equals(item.uploadedBy()))) {
@@ -176,11 +200,11 @@ public class VisualItemService {
 
         // Delete from Supabase Storage if image_path is tracked
         if (item.imagePath() != null && !item.imagePath().isBlank()) {
-            deleteFromSupabaseStorage(item.imagePath());
+            storageService.delete(item.imagePath());
         }
 
         // Delete record from database
-        adminPanelRepository.deleteVisualItem(pinId);
+        visualItemRepository.deleteVisualItem(pinId);
         // Broadcast deletion to admin WebSocket subscribers
         adminEventPublisher.publishDeletedImage(pinId);
         adminPanelService.publishCurrentOperations();
@@ -188,7 +212,7 @@ public class VisualItemService {
 
     public VisualItemResponse updatePin(long pinId, String title, String category, String description,
             Long currentUserId, boolean isAdmin) {
-        VisualItemResponse item = adminPanelRepository.findById(pinId)
+        VisualItemResponse item = visualItemRepository.findById(pinId)
                 .orElseThrow(() -> new IllegalArgumentException("Pin not found"));
 
         if (!isAdmin && (currentUserId == null || !currentUserId.equals(item.uploadedBy()))) {
@@ -198,73 +222,15 @@ public class VisualItemService {
             throw new IllegalArgumentException("Title is required");
         }
 
-        adminPanelRepository.updateVisualItem(
+        visualItemRepository.updateVisualItem(
                 pinId,
                 title.trim(),
                 category == null || category.trim().isEmpty() ? "General" : category.trim(),
                 description == null || description.trim().isEmpty() ? null : description.trim());
-        VisualItemResponse updated = adminPanelRepository.findById(pinId)
-            .orElseThrow(() -> new IllegalArgumentException("Pin not found"));
+        VisualItemResponse updated = visualItemRepository.findById(pinId)
+                .orElseThrow(() -> new IllegalArgumentException("Pin not found"));
         adminPanelService.publishCurrentOperations();
         return updated;
-    }
-
-    private String uploadToSupabaseStorage(byte[] fileBytes, String storagePath, String contentType) {
-        try {
-            String uploadUrl = String.format("%s/storage/v1/object/%s/%s",
-                    supabaseUrl, supabaseBucket, storagePath);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(uploadUrl))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("apikey", supabaseServiceRoleKey)
-                    .header("Authorization", "Bearer " + supabaseServiceRoleKey)
-                    .header("Content-Type", contentType)
-                    .header("x-upsert", "true")
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(fileBytes))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log.error("Supabase storage upload failed: HTTP {} - {}", response.statusCode(), response.body());
-                throw new IllegalStateException("Failed to upload to Supabase storage: " + response.body());
-            }
-
-            return String.format("%s/storage/v1/object/public/%s/%s",
-                    supabaseUrl, supabaseBucket, storagePath);
-        } catch (IOException | InterruptedException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            log.error("Exception during Supabase storage upload", e);
-            throw new IllegalStateException("Failed to upload image to Supabase Storage", e);
-        }
-    }
-
-    private void deleteFromSupabaseStorage(String storagePath) {
-        try {
-            String deleteUrl = String.format("%s/storage/v1/object/%s/%s",
-                    supabaseUrl, supabaseBucket, storagePath);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(deleteUrl))
-                    .timeout(Duration.ofSeconds(15))
-                    .header("apikey", supabaseServiceRoleKey)
-                    .header("Authorization", "Bearer " + supabaseServiceRoleKey)
-                    .DELETE()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                log.info("Successfully deleted image object from Supabase: {}", storagePath);
-            } else {
-                log.warn("Supabase returned status {} when deleting {}: {}", response.statusCode(), storagePath,
-                        response.body());
-            }
-        } catch (Exception e) {
-            log.error("Could not delete file from Supabase storage: {}", storagePath, e);
-        }
     }
 
     private String sanitizeBaseName(String originalFilename) {

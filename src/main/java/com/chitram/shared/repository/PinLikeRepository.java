@@ -12,26 +12,43 @@ public class PinLikeRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public boolean pinExists(long pinId) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM visual_items WHERE id = ?",
-                Integer.class,
-                pinId);
-        return count != null && count > 0;
+    public LikeMutation insertLike(long userId, long pinId) {
+        return jdbcTemplate.queryForObject(
+                """
+                        WITH pin AS (
+                            SELECT id FROM visual_items WHERE id = ?
+                        ), inserted AS (
+                            INSERT INTO pin_likes (user_id, visual_item_id)
+                            SELECT ?, id FROM pin
+                            ON CONFLICT (user_id, visual_item_id) DO NOTHING
+                            RETURNING visual_item_id
+                        )
+                        SELECT EXISTS(SELECT 1 FROM pin) AS pin_exists,
+                               EXISTS(SELECT 1 FROM inserted) AS changed
+                        """,
+                (resultSet, rowNumber) -> new LikeMutation(
+                        resultSet.getBoolean("pin_exists"),
+                        resultSet.getBoolean("changed")),
+                pinId, userId);
     }
 
-    public boolean insertLike(long userId, long pinId) {
-        return jdbcTemplate.update(
-                "INSERT INTO pin_likes (user_id, visual_item_id) VALUES (?, ?) ON CONFLICT (user_id, visual_item_id) DO NOTHING",
-                userId,
-                pinId) > 0;
-    }
-
-    public boolean deleteLike(long userId, long pinId) {
-        return jdbcTemplate.update(
-                "DELETE FROM pin_likes WHERE user_id = ? AND visual_item_id = ?",
-                userId,
-                pinId) > 0;
+    public LikeMutation deleteLike(long userId, long pinId) {
+        return jdbcTemplate.queryForObject(
+                """
+                        WITH pin AS (
+                            SELECT id FROM visual_items WHERE id = ?
+                        ), deleted AS (
+                            DELETE FROM pin_likes
+                            WHERE user_id = ? AND visual_item_id IN (SELECT id FROM pin)
+                            RETURNING visual_item_id
+                        )
+                        SELECT EXISTS(SELECT 1 FROM pin) AS pin_exists,
+                               EXISTS(SELECT 1 FROM deleted) AS changed
+                        """,
+                (resultSet, rowNumber) -> new LikeMutation(
+                        resultSet.getBoolean("pin_exists"),
+                        resultSet.getBoolean("changed")),
+                pinId, userId);
     }
 
     public long countLikes(long pinId) {
@@ -49,5 +66,8 @@ public class PinLikeRepository {
                 userId,
                 pinId);
         return count != null && count > 0;
+    }
+
+    public record LikeMutation(boolean pinExists, boolean changed) {
     }
 }

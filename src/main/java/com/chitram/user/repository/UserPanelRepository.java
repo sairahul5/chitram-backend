@@ -178,10 +178,15 @@ public class UserPanelRepository {
         public List<UserSummaryResponse> findFollowers(long currentUserId, long targetUserId) {
                 String sql = """
                                 SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
-                                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
+                                            COALESCE(follower_counts.followers_count, 0) AS followers_count,
                                        EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
                                 FROM user_follows f
                                 JOIN users u ON u.id = f.follower_id
+                                    LEFT JOIN (
+                                         SELECT following_id, COUNT(*) AS followers_count
+                                         FROM user_follows
+                                         GROUP BY following_id
+                                    ) follower_counts ON follower_counts.following_id = u.id
                                 WHERE f.following_id = ?
                                 ORDER BY f.created_at DESC
                                 """;
@@ -199,10 +204,15 @@ public class UserPanelRepository {
         public List<UserSummaryResponse> findFollowing(long currentUserId, long targetUserId) {
                 String sql = """
                                 SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
-                                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
+                                            COALESCE(follower_counts.followers_count, 0) AS followers_count,
                                        EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
                                 FROM user_follows f
                                 JOIN users u ON u.id = f.following_id
+                                    LEFT JOIN (
+                                         SELECT following_id, COUNT(*) AS followers_count
+                                         FROM user_follows
+                                         GROUP BY following_id
+                                    ) follower_counts ON follower_counts.following_id = u.id
                                 WHERE f.follower_id = ?
                                 ORDER BY f.created_at DESC
                                 """;
@@ -220,11 +230,16 @@ public class UserPanelRepository {
         public List<UserSummaryResponse> findSuggestedCreators(long currentUserId) {
                 String sql = """
                                 SELECT u.id, u.display_name, u.email, u.picture_url, u.username,
-                                       (SELECT COUNT(*) FROM user_follows uf WHERE uf.following_id = u.id) AS followers_count,
+                                            COALESCE(follower_counts.followers_count, 0) AS followers_count,
                                        EXISTS(SELECT 1 FROM user_follows uf2 WHERE uf2.follower_id = ? AND uf2.following_id = u.id) AS is_following
                                 FROM users u
+                                    LEFT JOIN (
+                                         SELECT following_id, COUNT(*) AS followers_count
+                                         FROM user_follows
+                                         GROUP BY following_id
+                                    ) follower_counts ON follower_counts.following_id = u.id
                                 WHERE u.id != ?
-                                ORDER BY followers_count DESC, u.created_at DESC
+                                    ORDER BY follower_counts.followers_count DESC NULLS LAST, u.created_at DESC
                                 LIMIT 20
                                 """;
                 return jdbcTemplate.query(sql, (rs, rowNum) -> new UserSummaryResponse(

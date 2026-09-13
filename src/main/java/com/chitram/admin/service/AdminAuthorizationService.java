@@ -1,21 +1,25 @@
 package com.chitram.admin.service;
 
-import com.chitram.admin.repository.AdminPanelRepository;
+import com.chitram.admin.repository.AdminUserRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AdminAuthorizationService {
 
-    private final AdminPanelRepository adminPanelRepository;
+    private final AdminUserRepository adminUserRepository;
 
-    public AdminAuthorizationService(AdminPanelRepository adminPanelRepository) {
-        this.adminPanelRepository = adminPanelRepository;
+    public AdminAuthorizationService(AdminUserRepository adminUserRepository) {
+        this.adminUserRepository = adminUserRepository;
     }
 
     public void requireAdmin(String email) {
-        if (email == null || !adminPanelRepository.isAdmin(email)) {
+        if (!hasAdminRole(email)) {
             throw new AccessDeniedException("Admin role required");
         }
+    }
+
+    public boolean hasAdminRole(String email) {
+        return email != null && adminUserRepository.isAdmin(email);
     }
 }

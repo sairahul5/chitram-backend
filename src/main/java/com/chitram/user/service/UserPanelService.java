@@ -1,7 +1,7 @@
 package com.chitram.user.service;
 
 import com.chitram.admin.dto.VisualItemResponse;
-import com.chitram.admin.repository.AdminPanelRepository;
+import com.chitram.admin.service.AdminAuthorizationService;
 import com.chitram.recommendation.model.InteractionType;
 import com.chitram.recommendation.service.RecommendationService;
 import com.chitram.user.dto.UserProfileDetailsResponse;
@@ -10,6 +10,7 @@ import com.chitram.user.dto.UserSummaryResponse;
 import com.chitram.user.entity.UserAccount;
 import com.chitram.user.repository.UserAccountRepository;
 import com.chitram.user.repository.UserPanelRepository;
+import com.chitram.shared.service.PlatformSettingsService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,17 +24,20 @@ public class UserPanelService {
 
     private final UserPanelRepository userPanelRepository;
     private final UserAccountRepository userAccountRepository;
-    private final AdminPanelRepository adminPanelRepository;
+    private final PlatformSettingsService platformSettingsService;
+    private final AdminAuthorizationService adminAuthorizationService;
     private final RecommendationService recommendationService;
 
     public UserPanelService(
             UserPanelRepository userPanelRepository,
             UserAccountRepository userAccountRepository,
-            AdminPanelRepository adminPanelRepository,
+            PlatformSettingsService platformSettingsService,
+            AdminAuthorizationService adminAuthorizationService,
             RecommendationService recommendationService) {
         this.userPanelRepository = userPanelRepository;
         this.userAccountRepository = userAccountRepository;
-        this.adminPanelRepository = adminPanelRepository;
+        this.platformSettingsService = platformSettingsService;
+        this.adminAuthorizationService = adminAuthorizationService;
         this.recommendationService = recommendationService;
     }
 
@@ -46,7 +50,7 @@ public class UserPanelService {
     }
 
     public List<UserSummaryResponse> searchUsers(String query) {
-        if (!adminPanelRepository.isPlatformSettingEnabled("public_profiles_enabled")) {
+        if (!platformSettingsService.arePublicProfilesEnabled()) {
             return List.of();
         }
         return userPanelRepository.searchUsers(query);
@@ -54,7 +58,7 @@ public class UserPanelService {
 
     @SuppressWarnings("null")
     public UserProfileDetailsResponse getProfile(String usernameOrId) {
-        if (!adminPanelRepository.isPlatformSettingEnabled("public_profiles_enabled")) {
+        if (!platformSettingsService.arePublicProfilesEnabled()) {
             throw new ResponseStatusException(FORBIDDEN, "Public profiles are currently disabled");
         }
         Optional<UserAccount> accountResult = userAccountRepository.findByUsername(usernameOrId.trim().toLowerCase());
@@ -75,7 +79,7 @@ public class UserPanelService {
         long followingCount = userPanelRepository.countFollowing(userId);
         long creationsCount = userPanelRepository.countCreations(userId);
         var creations = userPanelRepository.findCreationsByUserId(userId);
-        boolean isAdmin = adminPanelRepository.isAdmin(account.getEmail());
+        boolean isAdmin = adminAuthorizationService.hasAdminRole(account.getEmail());
 
         return new UserProfileDetailsResponse(
                 account.getId(),
