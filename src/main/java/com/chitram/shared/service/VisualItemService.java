@@ -182,6 +182,10 @@ public class VisualItemService {
         return new VisualFeedResponse(items, nextCursor, hasMore);
     }
 
+    public Optional<VisualItemResponse> findRandomTechItem(Long excludeId) {
+        return visualItemRepository.findRandomApprovedByCategory("tech", excludeId);
+    }
+
     public boolean areUploadsEnabled() {
         return platformSettingsService.isImageUploadsEnabled();
     }

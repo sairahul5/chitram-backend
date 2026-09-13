@@ -112,6 +112,29 @@ public class VisualItemRepository {
         return jdbcTemplate.query(sql.toString(), visualItemLikeRowMapper, params.toArray());
     }
 
+    public Optional<VisualItemResponse> findRandomApprovedByCategory(String category, Long excludeId) {
+        String sql = """
+                SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
+                       v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by, v.share_key,
+                       u.display_name AS creator_name, u.username AS creator_username,
+                       u.picture_url AS creator_picture_url
+                FROM visual_items v
+                LEFT JOIN users u ON u.id = v.uploaded_by
+                WHERE v.moderation_status = 'APPROVED'
+                  AND LOWER(v.category) = LOWER(?)
+                                    AND (CAST(? AS BIGINT) IS NULL OR v.id <> CAST(? AS BIGINT))
+                ORDER BY RANDOM()
+                LIMIT 1
+                """;
+        List<VisualItemResponse> items = jdbcTemplate.query(
+                sql,
+                visualItemRowMapper,
+                category,
+                excludeId,
+                excludeId);
+        return items.stream().findFirst();
+    }
+
     public Optional<VisualItemResponse> findById(long id) {
         List<VisualItemResponse> items = jdbcTemplate.query("""
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,

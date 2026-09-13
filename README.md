@@ -60,6 +60,7 @@ Google OAuth2 creates or updates a user and stores authenticated state in the `C
 
 - `/api/auth/*`: session status and logout; OAuth routes are `/oauth2/**` and `/login/**`.
 - `/api/visual-items/*`: public feed plus authenticated upload/edit/delete operations.
+- `/api/visual-items/random/tech`: returns one random approved tech image. Pass `excludeId` from the previous response, for example `/api/visual-items/random/tech?excludeId=42`, to ensure refreshes return a different image when another tech image exists.
 - `/api/recommendations/*`: status, personalized feed, and recommendation interactions.
 - `/api/admin/*`: admin dashboard, database/settings, users, categories, reports, moderation, and activity.
 - `/api/user/*`: profiles, search, saved pins, follows, and user operations.

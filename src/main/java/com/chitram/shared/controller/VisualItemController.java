@@ -74,6 +74,14 @@ public class VisualItemController {
         return visualItemService.findFeed(query, cursor, limit, currentUserId);
     }
 
+    @GetMapping("/random/tech")
+    public ResponseEntity<VisualItemResponse> getRandomTechItem(
+            @RequestParam(required = false) Long excludeId) {
+        return visualItemService.findRandomTechItem(excludeId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadVisualItem(
             @AuthenticationPrincipal OAuth2User user,
