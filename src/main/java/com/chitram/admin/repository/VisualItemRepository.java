@@ -69,7 +69,7 @@ public class VisualItemRepository {
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by, v.share_key,
                        u.display_name AS creator_name, u.username AS creator_username,
-                       u.picture_url AS creator_picture_url
+                              u.picture_url AS creator_picture_url
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
                 WHERE LOWER(v.title) LIKE LOWER(?) OR LOWER(v.category) LIKE LOWER(?)
@@ -117,7 +117,13 @@ public class VisualItemRepository {
                 SELECT v.id, v.title, v.category, v.image_url, v.image_path, v.width, v.height, v.aspect_ratio,
                        v.file_size, v.mime_type, v.description, v.created_at, v.uploaded_by, v.share_key,
                        u.display_name AS creator_name, u.username AS creator_username,
-                       u.picture_url AS creator_picture_url
+                                             u.picture_url AS creator_picture_url,
+                                             (SELECT COUNT(*) FROM pin_likes item_likes
+                                                WHERE item_likes.visual_item_id = v.id) AS like_count,
+                                             EXISTS (SELECT 1 FROM pin_likes current_like
+                                                             WHERE current_like.visual_item_id = v.id
+                                                                 AND current_like.user_id = COALESCE(CAST(? AS BIGINT), -1))
+                                                     AS liked_by_current_user
                 FROM visual_items v
                 LEFT JOIN users u ON u.id = v.uploaded_by
                 WHERE v.moderation_status = 'APPROVED'
@@ -128,7 +134,8 @@ public class VisualItemRepository {
                 """;
         List<VisualItemResponse> items = jdbcTemplate.query(
                 sql,
-                visualItemRowMapper,
+                visualItemLikeRowMapper,
+                null,
                 category,
                 excludeId,
                 excludeId);
